@@ -27,11 +27,15 @@ async function main() {
     throw new Error(`No snapshot at ${snapshotSource}. Run "npm run export:snapshot" first.`);
   });
 
-  const cssInput = path.join(out, 'input.css');
+  // Tailwind resolves its own package relative to the input file, so that file must live inside the project
+  // even when the output directory does not.
+  const work = path.join(root, 'dist/.build');
+  await mkdir(work, { recursive: true });
+  const cssInput = path.join(work, 'input.css');
   const globals = await readFile(path.join(root, 'app/globals.css'), 'utf8');
   // Tell Tailwind exactly which files can contain class names for this build.
   await writeFile(cssInput, globals.replace("@import 'tailwindcss';", `@import 'tailwindcss' source(none);\n@source '${path.join(root, 'components')}';\n@source '${path.join(root, 'artifact')}';`));
-  const cssOutput = path.join(out, 'app.css');
+  const cssOutput = path.join(work, 'app.css');
   execFileSync(path.join(root, 'node_modules/.bin/tailwindcss'), ['-i', cssInput, '-o', cssOutput, '--minify'], { stdio: 'pipe' });
   const css = await readFile(cssOutput, 'utf8');
 
