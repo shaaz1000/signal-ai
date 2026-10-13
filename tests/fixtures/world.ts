@@ -188,7 +188,13 @@ export function candidates(now: Date, phase: 0 | 1): Record<string, CandidateInp
         description: 'This survey reviews prompting strategies for language models that generate code.', author: 'C. Fixture', publishedAt: ago(70),
         kindHint: 'paper', claimType: 'preprint', tags: ['cs.CL'], primary: true, preFiltered: true,
       },
+      {
+        sourceId: 'arxiv', externalId: '2610.07777', url: 'https://arxiv.org/abs/2610.07777', title: 'Deep Learning Triage of Chest X-ray Studies: A Prospective Multi-center Study',
+        description: 'We evaluate a deep learning model for radiology triage of chest X-ray images in a prospective study across four hospitals, following an earlier retrospective analysis. The model flags studies for clinician review. We report sensitivity against radiologist consensus and discuss limitations.',
+        author: 'D. Fixture, E. Example', publishedAt: ago(50), kindHint: 'paper', claimType: 'preprint', tags: ['cs.CV', 'eess.IV'], primary: true, preFiltered: true,
+      },
     ],
+    // (arXiv list continues below with a medical-imaging study, for industry and maturity classification.)
     'hf-papers': [
       {
         sourceId: 'hf-papers', externalId: '2610.01234', url: 'https://arxiv.org/abs/2610.01234', sourceUrl: 'https://huggingface.co/papers/2610.01234',

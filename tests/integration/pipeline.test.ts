@@ -1,4 +1,4 @@
-import { count, eq } from 'drizzle-orm';
+import { count, count as countRows, eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createTestDb, type Db } from '@/lib/db/client';
 import { discoveries, ingestionRuns, rankingSnapshots, repoMetricSnapshots, sourceReferences, verificationEvidence } from '@/lib/db/schema';
@@ -322,5 +322,73 @@ describe('fixture seeding', () => {
   it('refuses to seed over ingested data', async () => {
     await discover();
     await expect(seedFixtures(db, NOW)).rejects.toThrow(/already holds/);
+  });
+});
+
+describe('classification, explanations and trends', () => {
+  beforeEach(async () => {
+    await discover(EARLIER, 0);
+    await discover(NOW, 1);
+    await verify();
+    await runRanking(db, { now: NOW, env, log });
+  });
+
+  it('assigns industries and the stated maturity of a medical study, quoting the source', async () => {
+    const study = (await loadViews(db, NOW)).find((v) => v.canonicalUrl.endsWith('2610.07777'))!;
+    expect(study.industries).toContain('healthcare');
+    expect(study.evidenceStage?.stage).toBe('clinical-trial');
+    // The cue is a phrase that really occurs in the source text.
+    expect(`${study.title} ${study.sources[0].title}`.toLowerCase()).toContain(study.evidenceStage!.cue!.toLowerCase());
+    expect(study.conceptId).toBe('medical-imaging');
+    // A trial is not clearance or deployment, and the record never says it is.
+    expect(JSON.stringify(study)).not.toMatch(/regulatory-clearance|clinical-deployment/);
+  });
+
+  it('records model facts from the hub and keeps publisher claims marked as claims', async () => {
+    const model = (await loadViews(db, NOW)).find((v) => v.kind === 'model')!;
+    expect(model.model).toEqual({ vendor: 'fixture-org', openWeights: true, license: 'apache-2.0', modalities: ['text'], independentlyTested: false });
+    expect(model.conceptId).toBe('model-release');
+  });
+
+  it('matches projects to the concept their own description names', async () => {
+    expect((await view(idOf('fixture-solo', 'tiny-agent-loop'))).conceptId).toBe('agent-loop');
+    expect((await view(idOf('fixture-retro', 'handheld-in-a-tab'))).conceptId).toBe('emulation');
+  });
+
+  it('builds a schema-valid explanation for every stored discovery', async () => {
+    const { buildExplanation } = await import('@/lib/explain/build');
+    const { ExplanationSchema } = await import('@/lib/explain/schema');
+    for (const v of await loadViews(db, NOW)) {
+      const e = buildExplanation(v);
+      expect(ExplanationSchema.safeParse(e).success, v.headline).toBe(true);
+      // Injected instructions in a README never reach an explanation or a draft.
+      expect(JSON.stringify(e)).not.toMatch(/ignore (all )?previous instructions/i);
+    }
+  });
+
+  it('stores one trend snapshot per topic per day and compares against its own history', async () => {
+    const { runTrends, loadTrends } = await import('@/lib/trends/run');
+    const { trendSnapshots } = await import('@/lib/db/schema');
+    const count = async () => (await db.select({ n: countRows() }).from(trendSnapshots))[0].n;
+    await runTrends(db, { now: NOW, env, log });
+    const first = await count();
+    expect(first).toBeGreaterThan(0);
+    expect((await loadTrends(db, NOW)).every((t) => t.status === 'new' && t.days === 1)).toBe(true);
+
+    await runTrends(db, { now: NOW, env, log }); // same day: idempotent
+    expect(await count()).toBe(first);
+
+    const tomorrow = new Date(NOW.getTime() + DAY);
+    await runTrends(db, { now: tomorrow, env, log });
+    const trends = await loadTrends(db, tomorrow);
+    expect(trends.length).toBeGreaterThan(0);
+    expect(trends.every((t) => t.days === 2 && t.status !== 'new' && t.previousItems !== null)).toBe(true);
+    // Only verified material counts, and every listed item exists.
+    const ids = new Set((await loadViews(db, tomorrow)).filter((v) => v.status === 'verified' || v.confidenceLevel === 'low').map((v) => v.id));
+    expect(trends.flatMap((t) => t.topIds).every((id) => ids.has(id))).toBe(true);
+
+    const snapshot = await buildSnapshot(db, 'pglite', tomorrow, 400, { trends });
+    expect(snapshot.trends).toHaveLength(trends.length);
+    expect(snapshot.generated).toEqual({});
   });
 });

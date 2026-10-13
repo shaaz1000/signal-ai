@@ -64,6 +64,10 @@ function view(overrides: ViewOverrides = {}): DiscoveryView {
       why: 'Why it matters.', how: null, whoCares: 'Readers.', limitations: [], applications: null, method: 'extractive', model: null,
     },
     repo: null,
+    industries: [],
+    evidenceStage: null,
+    conceptId: null,
+    model: null,
     flags: [],
     fixture: false,
     ...rest,
@@ -90,8 +94,8 @@ describe('parseQuery', () => {
   });
 
   it('accepts known values', () => {
-    expect(parseQuery({ q: ' rust agents ', category: 'agents', sort: 'gems', window: '7d', language: 'C++', age: 'month', activity: 'day', page: '3' })).toEqual({
-      q: 'rust agents', category: 'agents', sort: 'gems', window: '7d', language: 'C++', age: 'month', activity: 'day', page: 3,
+    expect(parseQuery({ q: ' rust agents ', category: 'agents', sort: 'gems', window: '7d', language: 'C++', age: 'month', activity: 'day', industry: 'healthcare', page: '3' })).toEqual({
+      q: 'rust agents', category: 'agents', sort: 'gems', window: '7d', language: 'C++', age: 'month', activity: 'day', industry: 'healthcare', page: 3,
     });
   });
 
@@ -138,7 +142,7 @@ describe('toSearchParams', () => {
   });
 
   it('round-trips through parseQuery', () => {
-    const original: FeedQuery = { q: 'rust agents', category: 'agents', sort: 'latest', window: '7d', language: 'C#', age: 'month', activity: 'week', page: 3 };
+    const original: FeedQuery = { q: 'rust agents', category: 'agents', sort: 'latest', window: '7d', language: 'C#', age: 'month', activity: 'week', industry: '', page: 3 };
     const params = Object.fromEntries(new URLSearchParams(toSearchParams(original)));
     expect(parseQuery(params)).toEqual(original);
   });

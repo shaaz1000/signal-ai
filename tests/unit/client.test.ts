@@ -12,7 +12,7 @@ describe('parsePrefs', () => {
   });
 
   it('reads a complete, valid value', () => {
-    const stored = { theme: 'dark', density: 'compact', hiddenCategories: ['robotics', 'launches'], hiddenGroups: ['news'], window: '7d', autoRefreshMinutes: 15 };
+    const stored = { theme: 'dark', density: 'compact', hiddenCategories: ['robotics', 'launches'], hiddenGroups: ['news'], window: '7d', autoRefreshMinutes: 15, language: 'hi', layer: 'deep' };
     expect(parsePrefs(JSON.stringify(stored))).toEqual(stored);
   });
 

@@ -106,10 +106,39 @@ test('never contacts another host', async ({ page }) => {
   expect([...hosts].sort()).toEqual(['cdnjs.cloudflare.com', 'localhost:3101']);
 });
 
-for (const token of ['today', 'discover', 'radar', 'research', 'gems', 'weekly', 'bookmarks', 'settings', 'status', 'more']) {
+for (const token of ['today', 'discover', 'radar', 'research', 'gems', 'weekly', 'bookmarks', 'settings', 'status', 'more', 'trending', 'models', 'industries', 'learn', 'content', 'account']) {
   test(`no horizontal overflow on #${token}`, async ({ page }) => {
     await page.goto(`${ARTIFACT}#${token}`);
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
   });
 }
+
+test('explains, plays a story and drafts content with no server', async ({ page }) => {
+  await page.goto(`${ARTIFACT}#learn`);
+  await results(page).first().getByRole('link').first().click();
+  await page.getByRole('link', { name: 'Understand how it works' }).first().click();
+  await expect(page).toHaveURL(/#learn-[a-f0-9]{12}$/);
+  await expect(page.getByRole('tablist')).toBeVisible();
+  await page.getByRole('radio', { name: 'Story Mode' }).click();
+  await expect(page.getByText('Scene 1 of 8', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Next scene' }).click();
+  await expect(page.getByText('Scene 2 of 8', { exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'Create content' }).click();
+  await expect(page).toHaveURL(/#studio-[a-f0-9]{12}$/);
+  await page.getByLabel('Format').selectOption('story-video');
+  await expect(page.getByLabel('Draft')).toContainText('Scene 1: The problem');
+});
+
+test('loads a bundled language as a separate file only when chosen, and says it cannot request translations', async ({ page }) => {
+  const requested: string[] = [];
+  page.on('request', (r) => requested.push(new URL(r.url()).pathname));
+  await page.goto(`${ARTIFACT}#learn`);
+  await results(page).first().getByRole('link').first().click();
+  await page.getByRole('link', { name: 'Understand how it works' }).first().click();
+  expect(requested.filter((p) => p.startsWith('/lang-'))).toEqual([]);
+  await page.getByLabel('Language').selectOption('hi');
+  await expect(page.getByRole('tabpanel')).toContainText(/[\u0900-\u097F]{3,}/);
+  expect(requested).toContain('/lang-hi.json');
+  await expect(page.getByText('This page has no server, so it cannot request one.')).toBeVisible();
+});

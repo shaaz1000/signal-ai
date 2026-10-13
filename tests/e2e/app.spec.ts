@@ -5,7 +5,7 @@ import { expect, test, type Page } from '@playwright/test';
  * Runs against a production build seeded with the labelled fixture world
  * (tests/fixtures/world.ts), on desktop, tablet and phone viewports.
  */
-const PAGES = ['/', '/discover', '/radar', '/research', '/gems', '/weekly', '/bookmarks', '/settings', '/status', '/more', '/unverified'];
+const PAGES = ['/', '/discover', '/radar', '/research', '/gems', '/weekly', '/bookmarks', '/settings', '/status', '/more', '/unverified', '/trending', '/models', '/industries', '/learn', '/content', '/account'];
 
 const overflow = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 const results = (page: Page) => page.getByRole('main').getByRole('article');
@@ -226,7 +226,8 @@ test.describe('Navigation, keyboard and layout', () => {
     } else {
       await expect(sidebar).toBeHidden();
       await expect(tabs).toBeVisible();
-      await tabs.getByRole('link', { name: 'Radar' }).click();
+      await tabs.getByRole('link', { name: 'More' }).click();
+      await page.getByRole('main').getByRole('link', { name: /GitHub Radar/ }).click();
     }
     await expect(page).toHaveURL(/\/radar/);
     await expect(page.getByRole('heading', { level: 1, name: 'GitHub Radar' })).toBeVisible();
@@ -235,7 +236,7 @@ test.describe('Navigation, keyboard and layout', () => {
   test('reaches every secondary page from More on small screens', async ({ page }) => {
     test.skip(isWide(page), 'More is the small-screen entry point');
     await page.goto('/more');
-    for (const name of ['Hidden Gems', 'What You Missed', 'Saved', 'Settings', 'Pipeline status']) {
+    for (const name of ['Trending', 'AI Models', 'Industries', 'GitHub Radar', 'Content Radar', 'Hidden Gems', 'What You Missed', 'Saved', 'Settings', 'Account', 'Pipeline status']) {
       await expect(page.getByRole('main').getByRole('link', { name: new RegExp(name) })).toBeVisible();
     }
     await page.getByRole('main').getByRole('link', { name: /Pipeline status/ }).click();
@@ -248,8 +249,8 @@ test.describe('Navigation, keyboard and layout', () => {
     await page.getByRole('button', { name: 'Agents', exact: true }).click();
     await expect(page).toHaveURL(/category=agents/);
     const nav = isWide(page) ? page.locator('aside') : page.locator('body > div > nav[aria-label="Sections"]');
-    await nav.getByRole('link', { name: /Radar/ }).click();
-    await expect(page).toHaveURL(/\/radar/);
+    await nav.getByRole('link', { name: 'Trending' }).click();
+    await expect(page).toHaveURL(/\/trending/);
     await nav.getByRole('link', { name: 'Discover' }).click();
     await expect(page).toHaveURL(/category=agents/);
   });

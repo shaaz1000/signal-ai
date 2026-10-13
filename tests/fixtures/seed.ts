@@ -5,6 +5,7 @@ import { runCuration } from '@/lib/curation/run';
 import { runDiscovery } from '@/lib/ingestion/run';
 import { runRanking } from '@/lib/scoring/run';
 import { runVerification } from '@/lib/verification/run';
+import { runTrends } from '@/lib/trends/run';
 import { createLogger } from '@/lib/utils/log';
 import { HOUR } from '@/lib/utils/time';
 import { fixtureAdapters, fixtureFetch, fixtureResolver } from './world';
@@ -29,6 +30,9 @@ export async function seedFixtures(db: Db, now: Date): Promise<number> {
   await runDiscovery(db, { now, env, log, adapters: fixtureAdapters(now, 1) });
   await runVerification(db, { now, env, log, http, resolveHost: fixtureResolver });
   await runRanking(db, { now, env, log });
+  // Two daily trend snapshots, so trend status has a history to compare against.
+  await runTrends(db, { now: new Date(now.getTime() - 24 * HOUR), env, log });
+  await runTrends(db, { now, env, log });
   await runCuration(db, { now, env, log });
 
   await db.update(discoveries).set({ origin: 'fixture' });
