@@ -31,6 +31,20 @@ The site then updates every three hours on GitHub's schedule. It shows the last 
 
 GitHub Pages on a private repository needs a paid plan; on a public repository it is free.
 
+## Translation and AI providers
+
+Both are optional and off by default. They only work in the deployed Next.js app; the static site and the Artifact show what was stored in advance.
+
+| To enable | Set |
+|---|---|
+| Any paid feature | `AUTH_SECRET` (32+ random characters), then create an account: `npm run admin -- user:create --name you` |
+| Translation | `TRANSLATION_PROVIDER` = `nvidia`, `openai` or `anthropic`, with that provider's key. NVIDIA and OpenAI-compatible endpoints also need the model named (`NVIDIA_TRANSLATION_MODEL`, `OPENAI_TRANSLATION_MODEL`): there is no default, because not every model a vendor offers is a translation model. |
+| AI rewrites of drafts | `AI_PROVIDER` = `anthropic` or `openai`, with its key (and `OPENAI_MODEL`) |
+
+**Choosing a translation model.** NVIDIA's documentation describes two different things: Riva neural machine translation (a dedicated translation service with its own API and a fixed language list) and Nemotron language models, which are general models that can translate when prompted. The adapter here speaks the OpenAI-compatible chat API that NVIDIA's hosted endpoints expose, so it suits a general model. Before choosing, check the model card for Hindi, Marathi and Arabic support, the licence terms for commercial use, and price per token; then test Hinglish output by hand, since no automatic metric covers it. None of this has been evaluated live here.
+
+Limits, budgets and the kill switch are documented in `.env.example` and [security.md](security.md).
+
 ## Deploying the app
 
 1. Create a Postgres database (a Supabase project works; use the pooler connection string).
@@ -60,6 +74,13 @@ Publish `signal-ai.html` with `snapshot.json` as a supporting file. The latest p
 
 ## Known limitations
 
+- **No provider has been called live.** Translation (NVIDIA, OpenAI-compatible, Anthropic) and AI draft rewriting are implemented and tested against stubs only. Translation quality, Hinglish naturalness and real provider behaviour are unverified.
+- **Hindi and Hinglish text for the concept library was written by a model** and has not been reviewed by a native-speaking subject expert. Other languages need a provider.
+- **Explanations are assembled, not written by a model.** The general part comes from a ten-entry concept library, so items outside those ten kinds get evidence-only explanations and no diagram.
+- **Trend status needs history.** Topics show as newly tracked until a second daily snapshot exists. Funding and regulatory activity are not tracked as separate signals.
+- **Model pricing and benchmarks are not extracted** as structured fields; model records hold publisher, weights availability, licence and modalities.
+- **Sign-in is by operator-issued token.** There is no self-service sign-up, password reset or per-session revocation.
+- **Story Mode ignores right-to-left layout**, and no screen reader has been tested on the diagrams.
 - **Summaries are extractive unless an AI provider is configured.** They quote and restate the sources, which keeps them grounded but plain. The Anthropic and OpenAI adapters are implemented and unit-tested against stubs; they have not been run against the live APIs because no key was available at build time.
 - **Reddit is not ingested** until OAuth credentials are supplied.
 - **Classification is keyword-based.** Categories and topical relevance are wrong at the margins.

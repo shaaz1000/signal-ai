@@ -13,6 +13,32 @@
 | GitHub Actions | Workflows default to `contents: read`. Only the pipeline job gets `contents: write`, used solely to update the `data` branch in embedded mode. Workflow inputs reach the shell through environment variables and are checked against an allow-list. | `.github/workflows/` |
 | Dependencies | `npm audit` for production dependencies runs in CI; Dependabot opens weekly update pull requests. | `.github/workflows/ci.yml`, `.github/dependabot.yml` |
 
+## Paid operations: translation and AI drafts
+
+Everything that can call a paid provider runs server-side behind one gate, `runProtected` in `lib/security/gate.ts`. Provider keys never reach the browser, the static site or the Artifact, none of which can call a provider at all.
+
+**Order of checks.** Input size, then the cache (a stored result is returned to anyone, free), then: kill switch, authentication, per-address signal, abuse cooldown, per-kind rate limit, per-user daily budget, global and per-provider daily budgets, provider circuit breaker, duplicate-request check, concurrent-job cap. Only then is the provider called, outside any database transaction and under a hard timeout.
+
+| Control | How |
+|---|---|
+| Identity | Operator-issued access tokens (only the SHA-256 is stored), exchanged for an httpOnly session cookie signed with `AUTH_SECRET`. No default secret: without one, nobody can sign in and all paid work is refused. |
+| Rate limits | Atomic fixed-window counters in Postgres: one `INSERT .. ON CONFLICT DO UPDATE .. WHERE count + n <= limit RETURNING` statement, so a denied request consumes nothing and parallel requests cannot overshoot. No in-memory counters. Defaults: 10 uncached translations an hour, 10 drafts a day, 2 concurrent jobs per user. |
+| Budgets | Per-user, global and per-provider daily budgets in units (characters in and out), reserved before the call and settled or refunded after. |
+| Duplicates | An idempotency key per user, operation and content version: an identical concurrent request gets 409, and a finished one gets the stored result, so one provider call is made. |
+| Kill switch | `GENERATION_DISABLED=true`, or at runtime `npm run admin -- flag:set generation_disabled true`. |
+| Circuit breaker | Opens for 60 seconds after five consecutive provider failures. There is no fallback to a different provider or model. |
+| Abuse detection | Repeated denials, or many distinct uncached requests in two minutes, trigger a 15 minute per-user cooldown. Addresses are a signal only and are stored hashed; nothing blocks on address alone and nothing is permanent. |
+| Fail closed | If identity, quota state or the kill switch cannot be read, or a limit is misconfigured, new paid work is refused with 503. Stored content stays readable. |
+| Audit | Completed generations and admin flag changes are written to `audit_logs`; denials to `abuse_events`. Both are pruned after 14 days by the weekly maintenance job. |
+
+**Translation integrity.** Before text is sent to a provider, URLs, code, numbers with units, dates, version strings, repository names and technical terms are replaced with placeholders, and restored afterwards. A response is rejected, and never stored or shown, if a placeholder is missing or duplicated, if it contains markup, if it is implausibly long, or if it echoes instruction-like text. The system prompt tells the model the text is data to translate, not instructions.
+
+**Generated content cannot corrupt source records.** Translations and AI drafts are rows in `generated_content`, keyed by subject, content version (a hash of the source text), language, provider and model. Nothing in that path writes to `discoveries`. A changed source produces a new version, so stale translations are simply not returned. An integration test asserts discovery rows are byte-identical before and after.
+
+**Explanations and diagrams** are data validated against a fixed schema: plain text only, no URLs, no code, a fixed set of diagram types rendered from a registry, and capped complexity. See [learn.md](learn.md).
+
+**Not verified.** No provider key was available, so no provider was called live: adapters were tested against stubs. The atomicity tests ran on a single-connection embedded Postgres; they prove the statements, not multi-connection locking on a hosted database.
+
 ## Reporting
 
 Open a private security advisory on the repository.

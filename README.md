@@ -6,7 +6,9 @@ A discovery engine for AI and emerging technology. It answers one question:
 
 It is not a news site. It watches GitHub, Hacker News, Lobsters, arXiv, Hugging Face, Product Hunt, engineering blogs and a handful of technology publications, collapses everything about one project into one record, verifies it against the primary source, scores it with an explainable formula, and shows the evidence next to every claim.
 
-**Discover early. Verify carefully. Explain clearly.**
+**Discover it. Verify it. Understand it. Visualize it. Explain it. Share it.**
+
+Beyond the feed, every discovery can be opened as an explanation at five depths, a step-through diagram and an eight-scene Story Mode, read in English, Hindi or Hinglish, and turned into scripts and articles in Creator Studio. Topics are tracked over time on the Trending page, with separate views for model releases and for eighteen industries.
 
 There are three ways to run it, all from this repository:
 
@@ -45,7 +47,10 @@ No network? `npm run seed:fixtures` fills an **empty** database with a small fic
 | `npm run rank` | Recompute scores and "why this is trending" for every active record |
 | `npm run curate` | Pick the featured story and build the weekly "What You Missed" edition |
 | `npm run maintain` | Retention: thin old snapshots, archive dormant records, purge rejected ones |
+| `npm run trends` | Daily trend snapshot per topic |
 | `npm run status` | Print pipeline status as JSON |
+| `npm run admin -- <command>` | Accounts, kill switch and usage: `user:create`, `user:disable`, `flag:set`, `usage` |
+| `npm run i18n:extract` | Print every fixed string a bundled language must cover |
 | `npm run db:generate` / `db:migrate` | Generate a migration from the schema / apply migrations |
 | `npm run export:snapshot` | Write `public/data/snapshot.json` for the Artifact |
 | `npm run build:artifact` | Build `dist/artifact/signal-ai.html` + `snapshot.json`. Add `-- --site dist/site` for the static-site version. |
@@ -68,6 +73,10 @@ All are server-side. None are exposed to the browser except `NEXT_PUBLIC_SITE_UR
 | `AI_MAX_ITEMS_PER_RUN` | No | Cost guard: most items sent to the model per run. Default 40. |
 | `RANKING_WEIGHTS` | No | JSON override for ranking weights, e.g. `{"novelty":0.3}`. Renormalised to 1. |
 | `VERIFY_LIMIT`, `GITHUB_CALL_BUDGET` | No | Per-run ceilings for verification and GitHub API calls. |
+| `AUTH_SECRET` | For any paid feature | Signs sessions. 32+ random characters, no default. Without it, sign-in and all new translation or AI generation are refused. |
+| `TRANSLATION_PROVIDER`, `NVIDIA_API_KEY`, `NVIDIA_TRANSLATION_MODEL`, `OPENAI_TRANSLATION_MODEL` | No | Translation of source text. See docs/operations.md. |
+| `GENERATION_DISABLED`, `LIMIT_*`, `GENERATION_*`, `ABUSE_*` | No | Kill switch, rate limits, budgets and abuse thresholds. Defaults are listed in `.env.example`. |
+| `API_RATE_LIMIT` | No | Requests a minute per client on the public JSON API. Default 60. |
 | `NEXT_PUBLIC_SITE_URL` | In production | Public base URL (metadata and the outbound User-Agent). |
 
 ## How it works
@@ -88,6 +97,8 @@ flowchart LR
 - **Architecture and data model:** [docs/architecture.md](docs/architecture.md)
 - **Sources, access methods and limits:** [docs/sources.md](docs/sources.md)
 - **Ranking and credibility formulas:** [docs/scoring.md](docs/scoring.md)
+- **Explanations, diagrams, Story Mode, languages, Creator Studio:** [docs/learn.md](docs/learn.md)
+- **HTTP API:** [docs/api.md](docs/api.md)
 - **Design system:** [docs/design-system.md](docs/design-system.md)
 - **Security:** [docs/security.md](docs/security.md)
 - **Operations, schedules and deployment:** [docs/operations.md](docs/operations.md)
@@ -101,6 +112,9 @@ flowchart LR
 - **Popularity is not credibility.** Stars add nothing to the confidence score. Star spikes with no matching forks or issues are flagged and discounted.
 - **Publication and discovery are separate.** `published_at` is what the source says; `first_discovered_at` is when the pipeline first saw it.
 - **Degraded is not failed.** A source that is down is recorded and skipped; the run continues and the UI reports reduced coverage.
+- **Evidence and general explanation never share a field.** Explanations show what the item's sources say apart from how that kind of technology generally works, and concept diagrams are marked illustrative.
+- **Generated text never overwrites a source record.** Translations and AI drafts are separate, versioned rows.
+- **Paid operations fail closed.** No account, no quota state or no secret means no provider call.
 - **Updates are periodic.** The UI shows the last ingestion, the last verification and the next scheduled run, and warns when data is stale. Nothing claims to be real time.
 
 ## Tests

@@ -79,3 +79,23 @@ Fixed editorial values, not measurements: MIT Technology Review and IEEE Spectru
 **Diversity.** A greedy re-rank discounts each repeat of an owner (×0.7), source (×0.94) and category (×0.97) among neighbours, so one organisation, outlet or topic cannot fill a page.
 
 **Time windows** apply to the publication date (creation date for repositories), falling back to the first-seen time when the source gives no date.
+
+## Trend intelligence
+
+Trends are about topics across many items, not single stories (`lib/trends/run.ts`).
+
+**What is counted.** Once a day, for every tag, category and industry: the verified items first seen in the last seven days, the number of independent sources referencing them, how many are repositories, papers and launches, and their average momentum and confidence. A topic is tracked once it has three such items. One row per topic per day is stored in `trend_snapshots`.
+
+**Status** comes only from a topic's own stored history:
+
+| Status | Rule |
+|---|---|
+| Newly tracked | One day of history. No direction is stated. |
+| Accelerating | At least 50% more items than the baseline a week earlier, and at least five items |
+| Emerging | Growing, with under a week of history |
+| Declining | Down 30% or more |
+| Established | Anything else with history |
+
+**Trend score** = 0.40 × average momentum + 0.25 × average confidence + 0.20 × breadth (item count, log scale) + 0.15 × coverage (independent sources). It measures attention that is backed by evidence. It does not measure quality or truth, and the page says so.
+
+Funding rounds and regulatory actions are not tracked as separate signals; they only count when they arrive as items from the existing sources.

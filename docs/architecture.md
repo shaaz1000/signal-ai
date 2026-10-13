@@ -28,6 +28,13 @@ lib/verification        Checks, credibility assessment, URL probing, verificatio
 lib/ai                  Provider adapters (Anthropic, OpenAI-compatible, extractive) and the output guard
 lib/scoring             Growth from snapshots, signals, weights, ranking runner
 lib/curation            Featured pick, weekly edition, retention
+lib/explain             Explanation schema, concept library, builder, diagram layout
+lib/creator             Creator Studio templates, Content Radar score, guarded AI rewrite
+lib/trends              Daily topic snapshots and trend classification
+lib/i18n                Interface strings, bundled Hindi and Hinglish, content localisation
+lib/translation         Provider adapters, term protection, validation
+lib/security            Accounts, atomic quotas, budgets, breaker, abuse detection, the gate
+lib/industries.ts       Industry registry and stated-maturity detection
 lib/feed                Search, filter, sort, diversity, Today layout (shared, pure)
 lib/db                  Schema, client, persistence, view builders
 lib/client              Host platform for components (Next.js implementation), bookmarks store
@@ -72,7 +79,13 @@ Every write is an upsert on a unique key, so any stage can be rerun safely. Each
 | `ranking_snapshots` | Score history with explanations | `(discovery_id, day)` |
 | `ingestion_runs` | Job status, per-source results, statistics | `id` |
 | `editions` | Daily featured pick and weekly edition | `(kind, period_start)` |
-| `users`, `collections`, `bookmarks` | Reserved for server-side bookmarks once accounts exist | see schema |
+| `model_releases` | Publisher, weights availability, licence, modalities, whether independently tested | `discovery_id` |
+| `trend_snapshots` | Per-topic daily counts, momentum and confidence | `(topic_kind, topic, day)` |
+| `generated_content` | Translations and AI drafts, apart from source records | `(kind, subject, content_version, language, variant, provider, model)` |
+| `usage_counters` | Atomic rate-limit and budget windows | `(key, window_start)` |
+| `generation_jobs` | One row per paid operation, with an idempotency key | `idempotency_key` |
+| `abuse_events`, `audit_logs`, `app_flags` | Denials, completed paid work and admin actions, runtime switches | see schema |
+| `users`, `collections`, `bookmarks` | Accounts for paid operations (token hash, plan, role); collections and bookmarks reserved for server-side saving | see schema |
 
 Timestamps are `timestamptz`. `published_at` (what the source says) and `first_discovered_at` (when the pipeline first saw it) are separate columns. Every foreign key is indexed; feed, score and verification-queue indexes match the queries that use them. Row level security is enabled on every table with no policies, so a Supabase anon key can read nothing; the server connects with the database role.
 
