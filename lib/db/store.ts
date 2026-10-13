@@ -7,7 +7,7 @@ import type { Logger } from '@/lib/utils/log';
 import { DAY } from '@/lib/utils/time';
 import type { Db } from './client';
 import {
-  categories, discoveries, discoveryTags, ingestionRuns, projects, repoMetricSnapshots,
+  categories, discoveries, discoveryTags, ingestionRuns, modelReleases, projects, repoMetricSnapshots,
   sourceReferences, sources, tags, verificationEvidence, type ProjectMetadata,
 } from './schema';
 
@@ -257,6 +257,7 @@ export interface Ctx {
   snaps: SnapshotRow[];
   evidence: EvidenceRow[];
   tags: string[];
+  model: typeof modelReleases.$inferSelect | null;
 }
 
 /** Loads discoveries with everything attached, in a fixed number of queries. */
@@ -296,6 +297,11 @@ export async function loadContexts(db: Db, opts: { ids?: string[]; statuses?: st
     () => db.select({ discoveryId: discoveryTags.discoveryId, slug: tags.slug }).from(discoveryTags).innerJoin(tags, eq(tags.id, discoveryTags.tagId)),
     (k: string[]) => db.select({ discoveryId: discoveryTags.discoveryId, slug: tags.slug }).from(discoveryTags).innerJoin(tags, eq(tags.id, discoveryTags.tagId)).where(inArray(discoveryTags.discoveryId, k)), ids);
 
+  const models = await collect(
+    () => db.select().from(modelReleases),
+    (k: string[]) => db.select().from(modelReleases).where(inArray(modelReleases.discoveryId, k)), ids);
+  const modelBy = new Map(models.map((m) => [m.discoveryId, m]));
+
   const group = <T, K>(rows: T[], key: (r: T) => K) => {
     const m = new Map<K, T[]>();
     for (const r of rows) {
@@ -322,6 +328,7 @@ export async function loadContexts(db: Db, opts: { ids?: string[]; statuses?: st
       snaps: snapsBy.get(p.id) ?? [],
       evidence: evBy.get(d.id) ?? [],
       tags: (tagsBy.get(d.id) ?? []).map((t) => t.slug),
+      model: modelBy.get(d.id) ?? null,
     });
   }
   return out;

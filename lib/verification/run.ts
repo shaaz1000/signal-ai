@@ -1,7 +1,9 @@
 import { and, asc, desc, eq, gte, inArray, isNull, lt, or, sql } from 'drizzle-orm';
 import type { CategoryId, ClaimType, JobSummary, Kind, SourceGroup } from '@/lib/types';
 import type { Db } from '@/lib/db/client';
-import { credibilityAssessments, discoveries, projects, repoMetricSnapshots, verificationEvidence, type ProjectMetadata } from '@/lib/db/schema';
+import { credibilityAssessments, discoveries, modelReleases, projects, repoMetricSnapshots, verificationEvidence, type ProjectMetadata } from '@/lib/db/schema';
+import { detectConcept } from '@/lib/explain/concepts';
+import { classifyIndustries, detectEvidenceStage } from '@/lib/industries';
 import { ACTIVE_STATUSES, finishRun, loadContexts, repoMetadata, startRun, upsertSnapshot, type Ctx } from '@/lib/db/store';
 import { resolveProvider, summarize } from '@/lib/ai/provider';
 import type { AiProvider, EvidencePack } from '@/lib/ai/types';
@@ -103,7 +105,8 @@ async function enrichHuggingFace(db: Db, ctx: Ctx, opts: { http: RunOptions['htt
     const res = await request(`${ctx.d.canonicalUrl}/raw/main/README.md`, { ...opts.http, retries: 1, timeoutMs: 12_000, maxBytes: 120_000 });
     // Drop the YAML front matter; it is configuration, not description.
     const card = res.text.replace(/^---[\s\S]*?---\s*/, '');
-    const metadata: ProjectMetadata = { ...ctx.p.metadata, readmeExcerpt: card.slice(0, 6000), readmeLength: card.length, enrichedAt: opts.now.toISOString() };
+    const license = res.text.match(/^---[\s\S]*?^license:\s*([\w.+-]{2,40})\s*$[\s\S]*?^---/m)?.[1];
+    const metadata: ProjectMetadata = { ...ctx.p.metadata, ...(license ? { hfLicense: license } : {}), readmeExcerpt: card.slice(0, 6000), readmeLength: card.length, enrichedAt: opts.now.toISOString() };
     await db.update(projects).set({ metadata, updatedAt: opts.now }).where(eq(projects.id, ctx.p.id));
     ctx.p = { ...ctx.p, metadata };
     return { probe: { state: 'ok', via: 'Hugging Face' }, docs: metadata.readmeExcerpt ?? '' };
@@ -112,6 +115,42 @@ async function enrichHuggingFace(db: Db, ctx: Ctx, opts: { http: RunOptions['htt
     if (err instanceof HttpError && (err.status === 401 || err.status === 403)) return { probe: { state: 'ok', via: 'Hugging Face listing API (card is gated)' }, docs: '' };
     return { probe: { state: 'error', via: (err as Error).message }, docs: '' };
   }
+}
+
+const MODALITIES: [RegExp, string][] = [
+  [/text|chat|feature-extraction|sentence|translation|summar|question/, 'text'],
+  [/image|vision|visual|depth|segmentation|object-detection/, 'image'],
+  [/audio|speech|voice/, 'audio'],
+  [/video/, 'video'],
+];
+
+/**
+ * Industry, maturity, concept and model facts. Industries and the model
+ * record use only the item's own title, description and tags; the stated
+ * maturity may also quote its documentation. Nothing here is inferred beyond
+ * what those texts say.
+ */
+export function classifyDiscovery(ctx: Ctx, description: string, docs: string) {
+  const own = `${ctx.d.title} ${description} ${ctx.tags.join(' ')}`;
+  const industries = classifyIndustries(own);
+  const stage = detectEvidenceStage({ text: `${own} ${docs.slice(0, 4000)}`, industries, claimType: ctx.d.claimType });
+  const conceptId = detectConcept({ headline: `${ctx.d.title} ${description}`, text: `${ctx.tags.join(' ')} ${docs.slice(0, 2000)}`, kind: ctx.d.kind });
+
+  const isHostedModel = ctx.d.kind === 'model';
+  const announcer = ctx.refs.find((r) => r.source.group === 'blog' && r.isPrimary);
+  const isAnnouncement = !isHostedModel && Boolean(announcer) && /\b(model|weights|llm)\b/i.test(own) && /\b(releas\w+|introduc\w+|announc\w+|launch\w+|available)\b/i.test(own);
+  const pipeline = `${ctx.p.metadata.hfPipeline ?? ''} ${ctx.tags.join(' ')}`;
+  const model = isHostedModel || isAnnouncement
+    ? {
+        vendor: isHostedModel ? ctx.p.owner : announcer?.source.name ?? null,
+        // Listed on the Hugging Face hub means the files can be downloaded. An announcement alone says nothing either way.
+        openWeights: isHostedModel ? true : /\bopen[- ]weights?\b/i.test(own) ? true : null,
+        license: ctx.p.metadata.hfLicense ?? null,
+        modalities: [...new Set(MODALITIES.filter(([re]) => re.test(pipeline)).map(([, m]) => m))],
+        independentlyTested: stage?.stage === 'independent-validation',
+      }
+    : null;
+  return { industries, stage, conceptId, model };
 }
 
 export function buildInput(ctx: Ctx, probe: Probe, docs: string, now: Date): VerificationInput {
@@ -192,7 +231,7 @@ export async function runVerification(db: Db, opts: VerifyOptions = {}): Promise
     });
 
     // B. The verification queue: never-verified first, then the oldest checks.
-    const cutoff = new Date(now.getTime() - (opts.maxAgeHours ?? (env.VERIFY_MAX_AGE_HOURS !== undefined ? Number(env.VERIFY_MAX_AGE_HOURS) : 24)) * HOUR);
+    const cutoff = new Date(now.getTime() - (opts.maxAgeHours ?? (env.VERIFY_MAX_AGE_HOURS ? Number(env.VERIFY_MAX_AGE_HOURS) : 24)) * HOUR);
     const queue = await db.select({ id: discoveries.id }).from(discoveries)
       .where(and(inArray(discoveries.status, ACTIVE_STATUSES), or(isNull(discoveries.lastVerifiedAt), lt(discoveries.lastVerifiedAt, cutoff))))
       .orderBy(sql`${discoveries.lastVerifiedAt} asc nulls first`, desc(discoveries.scoreTotal))
@@ -243,6 +282,7 @@ export async function runVerification(db: Db, opts: VerifyOptions = {}): Promise
         if (summary.editorial.method === 'llm') stats.summarisedByModel++;
         stats.guardViolations += summary.guardViolations;
         const keepModelNote = ctx.d.editorial?.method === 'llm' && summary.editorial.method !== 'llm';
+        const classification = classifyDiscovery(ctx, input.description, docs);
 
         await db.transaction(async (tx) => {
           const t = tx as unknown as Db;
@@ -254,9 +294,15 @@ export async function runVerification(db: Db, opts: VerifyOptions = {}): Promise
           await t.update(discoveries).set({
             status, confidence: credibility.score, confidenceLevel: credibility.level, credibilityFactors: credibility.factors,
             executionMode, lastVerifiedAt: now,
+            industries: classification.industries, evidenceStage: classification.stage?.stage ?? null, evidenceStageCue: classification.stage?.cue ?? null,
+            conceptId: classification.conceptId,
             ...(keepModelNote ? {} : { headline: summary.headline, summary: summary.summary, editorial: summary.editorial }),
             ...(summary.aiSignificance != null ? { aiSignificance: summary.aiSignificance } : {}),
           }).where(eq(discoveries.id, ctx.d.id));
+          if (classification.model) {
+            const model = { ...classification.model, updatedAt: now };
+            await t.insert(modelReleases).values({ discoveryId: ctx.d.id, ...model }).onConflictDoUpdate({ target: modelReleases.discoveryId, set: model });
+          }
         });
         stats[status]++;
       } catch (err) {

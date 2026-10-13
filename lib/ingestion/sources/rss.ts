@@ -107,6 +107,10 @@ export const FEEDS: FeedConfig[] = [
   feed('openai-news', 'OpenAI News', 'blog', 0.75, 'https://openai.com/news', 'https://openai.com/news/rss.xml', { preFiltered: true }),
   feed('deepmind-blog', 'Google DeepMind Blog', 'blog', 0.75, 'https://deepmind.google/blog', 'https://deepmind.google/blog/rss.xml', { preFiltered: true }),
   feed('google-research', 'Google Research Blog', 'blog', 0.8, 'https://research.google/blog', 'https://research.google/blog/rss/', { preFiltered: true }),
+  feed('microsoft-research', 'Microsoft Research', 'blog', 0.8, 'https://www.microsoft.com/en-us/research', 'https://www.microsoft.com/en-us/research/feed/'),
+  feed('meta-engineering', 'Engineering at Meta', 'blog', 0.75, 'https://engineering.fb.com', 'https://engineering.fb.com/feed/'),
+  feed('nvidia-blog', 'NVIDIA Blog', 'blog', 0.7, 'https://blogs.nvidia.com', 'https://blogs.nvidia.com/feed/'),
+  feed('mit-news-ai', 'MIT News: Artificial intelligence', 'blog', 0.85, 'https://news.mit.edu', 'https://news.mit.edu/rss/topic/artificial-intelligence2', { preFiltered: true, claimType: 'third_party' }),
   feed('simonwillison', "Simon Willison's Weblog", 'blog', 0.7, 'https://simonwillison.net', 'https://simonwillison.net/atom/everything/', {
     claimType: 'third_party', primary: false, preFiltered: true,
   }),

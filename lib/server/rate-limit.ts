@@ -4,7 +4,8 @@
  * Upstash) is the upgrade path for multi-instance deployments.
  */
 const WINDOW_MS = 60_000;
-const LIMIT = 60;
+// Requests per minute per client. Overridable so load tests and trusted internal callers can raise it.
+const LIMIT = Math.max(1, Number(process.env.API_RATE_LIMIT) || 60);
 const hits = new Map<string, { count: number; resetAt: number }>();
 
 export function clientKey(headers: Headers): string {

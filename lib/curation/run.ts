@@ -2,7 +2,7 @@ import { and, eq, inArray, lt, or, sql, isNull } from 'drizzle-orm';
 import { categoryName, type CategoryId, type DiscoveryView, type JobSummary, type WeeklyEdition } from '@/lib/types';
 import type { Db } from '@/lib/db/client';
 import {
-  credibilityAssessments, discoveries, editions, ingestionRuns, rankingSnapshots, repoMetricSnapshots, tags,
+  abuseEvents, credibilityAssessments, discoveries, editions, generationJobs, ingestionRuns, rankingSnapshots, repoMetricSnapshots, tags, trendSnapshots, usageCounters,
 } from '@/lib/db/schema';
 import { finishRun, startRun } from '@/lib/db/store';
 import { loadViews } from '@/lib/db/views';
@@ -79,6 +79,9 @@ export const RETENTION = {
   /** Unseen and inactive for this long: archived (hidden, not deleted). */
   archiveAfterDays: 45,
   rejectedDays: 14,
+  /** Quota counters, finished jobs and abuse events: operational records, not history worth keeping. */
+  usageDays: 14,
+  trendDays: 180,
 };
 
 /** Weekly archive maintenance. Every statement is safe to run repeatedly. */
@@ -106,7 +109,12 @@ export async function runMaintenance(db: Db, opts: RunOptions = {}): Promise<Job
     const purged = affected(await db.delete(discoveries).where(and(eq(discoveries.status, 'rejected'), lt(discoveries.lastSeenAt, ago(RETENTION.rejectedDays)))).returning({ id: discoveries.id }));
     const orphanTags = affected(await db.delete(tags).where(sql`not exists (select 1 from discovery_tags dt where dt.tag_id = ${tags.id})`).returning({ id: tags.id }));
 
-    const stats = { thinnedSnapshots: thinned, expiredSnapshots, rankings, runs, assessments, archived, purged, orphanTags };
+    const usage = affected(await db.delete(usageCounters).where(lt(usageCounters.windowStart, ago(RETENTION.usageDays))).returning({ key: usageCounters.key }));
+    const jobs = affected(await db.delete(generationJobs).where(lt(generationJobs.startedAt, ago(RETENTION.usageDays))).returning({ id: generationJobs.id }));
+    const abuse = affected(await db.delete(abuseEvents).where(lt(abuseEvents.createdAt, ago(RETENTION.usageDays))).returning({ id: abuseEvents.id }));
+    const trends = affected(await db.delete(trendSnapshots).where(lt(trendSnapshots.day, ago(RETENTION.trendDays).toISOString().slice(0, 10))).returning({ id: trendSnapshots.id }));
+
+    const stats = { usage, jobs, abuse, trends, thinnedSnapshots: thinned, expiredSnapshots, rankings, runs, assessments, archived, purged, orphanTags };
     await finishRun(db, runId, { status: 'success', stats }, new Date());
     log.info('maintenance finished', stats);
     return { job: 'maintain', status: 'success', startedAt: now.toISOString(), finishedAt: new Date().toISOString(), providers: [], stats, error: null };

@@ -8,6 +8,8 @@ import { DAY, HOUR, nextDiscoveryRun } from '@/lib/utils/time';
 import type { Db, StorageKind } from './client';
 import { discoveries, editions } from './schema';
 import { ACTIVE_STATUSES, lastRun, loadContexts, type Ctx } from './store';
+import { generatedContent } from './schema';
+import type { GeneratedRecord, TrendView } from '@/lib/types';
 
 const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null);
 
@@ -83,6 +85,12 @@ export function toView(ctx: Ctx, now: Date): DiscoveryView {
       model: null,
     },
     repo: repoView(ctx, now),
+    industries: d.industries,
+    evidenceStage: d.evidenceStage ? { stage: d.evidenceStage, cue: d.evidenceStageCue } : null,
+    conceptId: d.conceptId,
+    model: ctx.model
+      ? { vendor: ctx.model.vendor, openWeights: ctx.model.openWeights, license: ctx.model.license, modalities: ctx.model.modalities, independentlyTested: ctx.model.independentlyTested }
+      : null,
     flags: d.flags,
     fixture: d.origin === 'fixture',
   };
@@ -138,7 +146,22 @@ export async function loadWeekly(db: Db): Promise<WeeklyEdition | null> {
   return row && 'sections' in row.payload ? row.payload : null;
 }
 
-export async function buildSnapshot(db: Db, storage: StorageKind, now: Date, limit = 400): Promise<Snapshot> {
+/** Cached generated records for the given discoveries, newest per kind and language. */
+export async function loadGenerated(db: Db, ids: Set<string>): Promise<Record<string, GeneratedRecord>> {
+  const rows = await db.select().from(generatedContent).orderBy(desc(generatedContent.createdAt)).limit(2000);
+  const out: Record<string, GeneratedRecord> = {};
+  for (const r of rows) {
+    if (!r.subject.startsWith('discovery:') || !ids.has(r.subject.slice(10))) continue;
+    const key = `${r.kind}:${r.subject}:${r.language}${r.variant ? `:${r.variant}` : ''}`;
+    out[key] ??= {
+      kind: r.kind as GeneratedRecord['kind'], subject: r.subject, language: r.language, contentVersion: r.contentVersion,
+      provider: r.provider, model: r.model, createdAt: r.createdAt.toISOString(), payload: r.payload,
+    };
+  }
+  return out;
+}
+
+export async function buildSnapshot(db: Db, storage: StorageKind, now: Date, limit = 400, opts: { trends?: TrendView[] } = {}): Promise<Snapshot> {
   const [status, views, weekly, daily] = await Promise.all([
     loadStatus(db, storage, now), loadViews(db, now), loadWeekly(db), loadEdition(db, 'daily'),
   ]);
@@ -162,5 +185,7 @@ export async function buildSnapshot(db: Db, storage: StorageKind, now: Date, lim
     discoveries: views.filter((v) => keep.has(v.id)),
     weekly,
     featuredId: daily?.featuredId ?? null,
+    trends: opts.trends ?? [],
+    generated: await loadGenerated(db, keep),
   };
 }

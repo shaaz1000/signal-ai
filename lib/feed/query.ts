@@ -4,6 +4,8 @@
  * Pure functions over `DiscoveryView[]`; no I/O.
  */
 import { CATEGORY_IDS, type CategoryId, type DiscoveryView, type SourceGroup } from '@/lib/types';
+import { contentOpportunity } from '@/lib/creator/templates';
+import { INDUSTRIES } from '@/lib/industries';
 
 export const SORTS = [
   { id: 'trending', name: 'Trending', hint: 'Overall score, with one owner or source kept from dominating.' },
@@ -14,6 +16,7 @@ export const SORTS = [
   { id: 'gems', name: 'Hidden gems', hint: 'Low-visibility projects that score well on novelty.' },
   { id: 'open-source', name: 'Open source', hint: 'Projects with public code.' },
   { id: 'verified', name: 'Verified breakthroughs', hint: 'High confidence and referenced by at least two independent sources.' },
+  { id: 'content', name: 'Best story potential', hint: 'New, explainable and verified, and not yet widely covered.' },
 ] as const;
 export type SortId = (typeof SORTS)[number]['id'];
 
@@ -48,10 +51,12 @@ export interface FeedQuery {
   language: string;
   age: RepoAgeId;
   activity: ActivityId;
+  /** Industry id from lib/industries.ts, or empty for all. */
+  industry: string;
   page: number;
 }
 
-export const DEFAULT_QUERY: FeedQuery = { q: '', category: 'all', sort: 'trending', window: 'all', language: '', age: 'any', activity: 'any', page: 1 };
+export const DEFAULT_QUERY: FeedQuery = { q: '', category: 'all', sort: 'trending', window: 'all', language: '', age: 'any', activity: 'any', industry: '', page: 1 };
 export const PAGE_SIZE = 24;
 
 const oneOf = <T extends string>(value: unknown, allowed: readonly T[], fallback: T): T =>
@@ -70,6 +75,7 @@ export function parseQuery(params: Record<string, string | string[] | undefined>
     language: (get('language') ?? base.language).slice(0, 40).replace(/[^\w+#. -]/g, ''),
     age: oneOf(get('age'), REPO_AGES.map((a) => a.id), base.age),
     activity: oneOf(get('activity'), ACTIVITY.map((a) => a.id), base.activity),
+    industry: oneOf(get('industry'), ['', ...INDUSTRIES.map((i) => i.id)], base.industry),
     page: Number.isFinite(page) && page > 0 ? Math.min(page, 50) : 1,
   };
 }
@@ -78,7 +84,7 @@ export function parseQuery(params: Record<string, string | string[] | undefined>
 export function toSearchParams(query: FeedQuery, defaults: Partial<FeedQuery> = {}): string {
   const base = { ...DEFAULT_QUERY, ...defaults };
   const out = new URLSearchParams();
-  for (const key of ['q', 'category', 'sort', 'window', 'language', 'age', 'activity'] as const) {
+  for (const key of ['q', 'category', 'sort', 'window', 'language', 'age', 'activity', 'industry'] as const) {
     if (query[key] && query[key] !== base[key]) out.set(key, query[key]);
   }
   if (query.page > 1) out.set('page', String(query.page));
@@ -127,6 +133,7 @@ const SORTERS: Record<SortId, (d: DiscoveryView) => number> = {
   gems: (d) => d.scores.gem,
   'open-source': (d) => d.scores.total,
   verified: (d) => d.scores.significance + d.scores.credibility * 0.5,
+  content: (d) => contentOpportunity(d).score,
 };
 
 /**
@@ -204,6 +211,7 @@ export function queryFeed(all: DiscoveryView[], query: FeedQuery, now: Date | st
     if (prefs.hiddenCategories.includes(d.category) && query.category !== d.category) return false;
     if (prefs.hiddenGroups.includes(primaryGroup(d))) return false;
     if (query.category !== 'all' && d.category !== query.category) return false;
+    if (query.industry && !d.industries.includes(query.industry)) return false;
     if (windowHours !== null && nowMs - eventDate(d) > windowHours * 3_600_000) return false;
     if (query.language && d.repo?.language?.toLowerCase() !== query.language.toLowerCase()) return false;
     if (ageDays !== null && (!d.repo?.createdAt || nowMs - new Date(d.repo.createdAt).getTime() > ageDays * 86_400_000)) return false;
@@ -211,6 +219,7 @@ export function queryFeed(all: DiscoveryView[], query: FeedQuery, now: Date | st
     if (query.sort === 'gems' && d.scores.gem <= 0) return false;
     if (query.sort === 'open-source' && !isOpenSource(d)) return false;
     if (query.sort === 'verified' && !isVerifiedBreakthrough(d)) return false;
+    if (query.sort === 'content' && d.status !== 'verified') return false;
     const r = matchesSearch(d, terms);
     if (!r) return false;
     relevance.set(d.id, r);

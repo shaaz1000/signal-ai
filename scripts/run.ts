@@ -1,7 +1,7 @@
 /**
  * Pipeline CLI. `tsx scripts/run.ts <command>`
  *
- *   migrate | discover | verify | rank | curate | maintain | pipeline
+ *   migrate | discover | verify | rank | trends | curate | maintain | pipeline
  *   status  | export [path] | seed-fixtures
  *
  * Exit code is 1 only when a job fails outright; a degraded run (some
@@ -15,6 +15,7 @@ import { runCuration, runMaintenance } from '@/lib/curation/run';
 import { runDiscovery } from '@/lib/ingestion/run';
 import { runRanking } from '@/lib/scoring/run';
 import { runVerification } from '@/lib/verification/run';
+import { runTrends } from '@/lib/trends/run';
 import { log } from '@/lib/utils/log';
 import type { JobSummary } from '@/lib/types';
 
@@ -34,11 +35,12 @@ async function main(): Promise<number> {
     rank: () => runRanking(db),
     curate: () => runCuration(db),
     maintain: () => runMaintenance(db),
+    trends: () => runTrends(db),
   };
 
   if (command === 'pipeline') {
     let failed = false;
-    for (const name of ['discover', 'verify', 'rank', 'curate']) {
+    for (const name of ['discover', 'verify', 'rank', 'trends', 'curate']) {
       const result = await jobs[name]();
       failed ||= result.status === 'failed';
       // Verification and ranking still add value on existing data if discovery failed.
@@ -53,7 +55,8 @@ async function main(): Promise<number> {
   }
   if (command === 'export') {
     const target = path.resolve(arg ?? 'public/data/snapshot.json');
-    const snapshot = await buildSnapshot(db, kind, new Date());
+    const { loadTrends } = await import('@/lib/trends/run');
+    const snapshot = await buildSnapshot(db, kind, new Date(), 400, { trends: await loadTrends(db, new Date()) });
     await mkdir(path.dirname(target), { recursive: true });
     await writeFile(target, JSON.stringify(snapshot));
     log.info('snapshot exported', { target, discoveries: snapshot.discoveries.length, mode: snapshot.status.dataMode });

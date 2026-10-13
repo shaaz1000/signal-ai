@@ -64,6 +64,7 @@ export interface ProjectMetadata {
   hfLikes?: number;
   hfDownloads?: number;
   hfPipeline?: string;
+  hfLicense?: string;
   hasCode?: boolean;
   codeUrl?: string;
   enrichedAt?: string;
@@ -108,6 +109,10 @@ export const discoveries = pgTable('discoveries', {
   /** Optional 0..100 judgement from the configured AI provider, blended into significance. */
   aiSignificance: real('ai_significance'),
   flags: jsonb('flags').$type<string[]>().notNull().default([]),
+  industries: jsonb('industries').$type<string[]>().notNull().default([]),
+  evidenceStage: text('evidence_stage'),
+  evidenceStageCue: text('evidence_stage_cue'),
+  conceptId: text('concept_id'),
   /** Provenance: which pipeline wrote this row. `fixture` rows are never shown as ingested. */
   origin: text('origin').notNull().default('ingestion'),
 }, (t) => [
@@ -237,8 +242,118 @@ export const editions = pgTable('editions', {
 export const users = pgTable('users', {
   id: id(),
   externalId: text('external_id').notNull(),
+  name: text('name'),
+  /** Entitlement tier; limits per plan live in lib/security/config.ts. */
+  plan: text('plan').notNull().default('free'),
+  role: text('role').notNull().default('user'),
+  /** SHA-256 of the access token. The token itself is shown once at creation and never stored. */
+  tokenHash: text('token_hash'),
+  preferences: jsonb('preferences').$type<Record<string, unknown>>().notNull().default({}),
+  disabledAt: ts('disabled_at'),
   createdAt: ts('created_at').notNull().defaultNow(),
-}, (t) => [uniqueIndex('users_external_uq').on(t.externalId)]).enableRLS();
+}, (t) => [uniqueIndex('users_external_uq').on(t.externalId), uniqueIndex('users_token_hash_uq').on(t.tokenHash)]).enableRLS();
+
+export const modelReleases = pgTable('model_releases', {
+  discoveryId: text('discovery_id').primaryKey().references(() => discoveries.id, { onDelete: 'cascade' }),
+  vendor: text('vendor'),
+  openWeights: boolean('open_weights'),
+  license: text('license'),
+  modalities: jsonb('modalities').$type<string[]>().notNull().default([]),
+  independentlyTested: boolean('independently_tested').notNull().default(false),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+}).enableRLS();
+
+export const trendSnapshots = pgTable('trend_snapshots', {
+  id: id(),
+  topicKind: text('topic_kind').notNull(),
+  topic: text('topic').notNull(),
+  day: text('day').notNull(),
+  items: integer('items').notNull(),
+  sources: integer('sources').notNull(),
+  repos: integer('repos').notNull(),
+  papers: integer('papers').notNull(),
+  launches: integer('launches').notNull(),
+  momentum: real('momentum').notNull(),
+  credibility: real('credibility').notNull(),
+  topIds: jsonb('top_ids').$type<string[]>().notNull().default([]),
+}, (t) => [uniqueIndex('trend_topic_day_uq').on(t.topicKind, t.topic, t.day), index('trend_day_idx').on(t.day)]).enableRLS();
+
+/**
+ * Everything a model or translator produced. Kept apart from discoveries so
+ * generated text can never overwrite a verified source record, and versioned
+ * by the hash of the source it was made from so a changed source invalidates it.
+ */
+export const generatedContent = pgTable('generated_content', {
+  id: id(),
+  kind: text('kind').notNull(),
+  /** `discovery:<id>` or `concept:<id>`. */
+  subject: text('subject').notNull(),
+  contentVersion: text('content_version').notNull(),
+  language: text('language').notNull().default('en'),
+  /** Format and tone for drafts; empty otherwise. */
+  variant: text('variant').notNull().default(''),
+  provider: text('provider').notNull(),
+  model: text('model').notNull(),
+  payload: jsonb('payload').$type<unknown>().notNull(),
+  createdBy: bigint('created_by', { mode: 'number' }).references(() => users.id, { onDelete: 'set null' }),
+  createdAt: ts('created_at').notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex('generated_identity_uq').on(t.kind, t.subject, t.contentVersion, t.language, t.variant, t.provider, t.model),
+  index('generated_subject_idx').on(t.subject, t.kind, t.language),
+  index('generated_created_by_idx').on(t.createdBy),
+]).enableRLS();
+
+/** Fixed-window counters, incremented atomically with INSERT .. ON CONFLICT DO UPDATE .. RETURNING. */
+export const usageCounters = pgTable('usage_counters', {
+  key: text('key').notNull(),
+  windowStart: ts('window_start').notNull(),
+  count: integer('count').notNull().default(0),
+  cost: real('cost').notNull().default(0),
+}, (t) => [primaryKey({ columns: [t.key, t.windowStart] }), index('usage_window_idx').on(t.windowStart)]).enableRLS();
+
+export const generationJobs = pgTable('generation_jobs', {
+  id: id(),
+  userId: bigint('user_id', { mode: 'number' }).references(() => users.id, { onDelete: 'cascade' }),
+  kind: text('kind').notNull(),
+  subject: text('subject').notNull(),
+  /** Same user, same request: the second caller gets the first job's result instead of a second paid call. */
+  idempotencyKey: text('idempotency_key').notNull(),
+  status: text('status').notNull().default('running'),
+  costEstimate: real('cost_estimate').notNull().default(0),
+  resultId: bigint('result_id', { mode: 'number' }),
+  error: text('error'),
+  startedAt: ts('started_at').notNull().defaultNow(),
+  finishedAt: ts('finished_at'),
+}, (t) => [
+  uniqueIndex('jobs_idempotency_uq').on(t.idempotencyKey),
+  index('jobs_user_status_idx').on(t.userId, t.status),
+]).enableRLS();
+
+export const abuseEvents = pgTable('abuse_events', {
+  id: id(),
+  userId: bigint('user_id', { mode: 'number' }).references(() => users.id, { onDelete: 'cascade' }),
+  /** Salted hash; raw addresses are not stored. */
+  ipHash: text('ip_hash'),
+  kind: text('kind').notNull(),
+  detail: jsonb('detail').$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: ts('created_at').notNull().defaultNow(),
+}, (t) => [index('abuse_user_idx').on(t.userId, t.createdAt.desc()), index('abuse_created_idx').on(t.createdAt)]).enableRLS();
+
+export const auditLogs = pgTable('audit_logs', {
+  id: id(),
+  actor: text('actor').notNull(),
+  action: text('action').notNull(),
+  subject: text('subject').notNull(),
+  detail: jsonb('detail').$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: ts('created_at').notNull().defaultNow(),
+}, (t) => [index('audit_created_idx').on(t.createdAt.desc())]).enableRLS();
+
+/** Runtime switches an operator can flip without a deploy, e.g. `generation_disabled`. */
+export const appFlags = pgTable('app_flags', {
+  key: text('key').primaryKey(),
+  value: jsonb('value').$type<unknown>().notNull(),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
+}).enableRLS();
 
 export const collections = pgTable('collections', {
   id: id(),

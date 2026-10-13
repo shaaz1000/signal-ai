@@ -150,6 +150,36 @@ export interface RepoView {
   anomaly: boolean;
 }
 
+/** Facts about a model release. Null fields mean the sources did not say. */
+export interface ModelView {
+  vendor: string | null;
+  openWeights: boolean | null;
+  license: string | null;
+  modalities: string[];
+  /** Capabilities are the publisher's claims unless `independentlyTested` is true. */
+  independentlyTested: boolean;
+}
+
+export interface TrendView {
+  kind: 'tag' | 'category' | 'industry';
+  topic: string;
+  name: string;
+  status: 'emerging' | 'accelerating' | 'established' | 'declining' | 'new';
+  /** Items seen in the latest daily window and the one before it. */
+  items: number;
+  previousItems: number | null;
+  sources: number;
+  repos: number;
+  papers: number;
+  momentum: number;
+  credibility: number;
+  score: number;
+  /** Days of history behind this classification. */
+  days: number;
+  reasons: string[];
+  topIds: string[];
+}
+
 export interface Editorial {
   what: string;
   why: string;
@@ -189,6 +219,13 @@ export interface DiscoveryView {
   sources: SourceRefView[];
   editorial: Editorial;
   repo: RepoView | null;
+  /** Industry ids from `lib/industries.ts`. Empty when the item is not industry-specific. */
+  industries: string[];
+  /** How far along the claim is, with the source phrase that says so (null cue: implied by the claim type). */
+  evidenceStage: { stage: string; cue: string | null } | null;
+  /** Concept-library entry that best matches, used to pick an explainer. */
+  conceptId: string | null;
+  model: ModelView | null;
   flags: string[];
   /** True for records created by the fixture seeder, never by ingestion. */
   fixture: boolean;
@@ -245,4 +282,18 @@ export interface Snapshot {
   discoveries: DiscoveryView[];
   weekly: WeeklyEdition | null;
   featuredId: string | null;
+  trends: TrendView[];
+  /** Cached generated records (translations, model-drafted explanations), keyed `kind:subject:language`. */
+  generated: Record<string, GeneratedRecord>;
+}
+
+export interface GeneratedRecord {
+  kind: 'translation' | 'explanation' | 'draft';
+  subject: string;
+  language: string;
+  contentVersion: string;
+  provider: string;
+  model: string;
+  createdAt: string;
+  payload: unknown;
 }

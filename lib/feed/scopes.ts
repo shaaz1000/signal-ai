@@ -31,6 +31,27 @@ export const SCOPES = {
     scope: (d: DiscoveryView) => !passesGate(d),
     includeUnverified: true,
   },
+  models: {
+    defaults: { sort: 'latest' },
+    sorts: ['latest', 'trending', 'innovative', 'verified'],
+    scope: (d: DiscoveryView) => d.model !== null,
+  },
+  industries: {
+    defaults: { sort: 'trending' },
+    sorts: ['trending', 'latest', 'innovative', 'verified'],
+    scope: (d: DiscoveryView) => d.industries.length > 0,
+  },
+  learn: {
+    defaults: { sort: 'trending' },
+    sorts: ['trending', 'latest', 'innovative'],
+    // Something to teach from: a matching concept or a documented mechanism.
+    scope: (d: DiscoveryView) => Boolean(d.conceptId || d.editorial.how),
+  },
+  content: {
+    defaults: { sort: 'content' },
+    sorts: ['content', 'latest', 'trending'],
+    scope: (d: DiscoveryView) => d.status === 'verified',
+  },
 } satisfies Record<string, ScopeConfig>;
 
 export type ScopeId = keyof typeof SCOPES;

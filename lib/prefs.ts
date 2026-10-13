@@ -1,5 +1,6 @@
 import { CATEGORY_IDS, type CategoryId, type SourceGroup } from '@/lib/types';
 import type { WindowId } from '@/lib/feed/query';
+import { UI_LANGUAGES } from '@/lib/i18n/languages';
 
 export interface Prefs {
   theme: 'system' | 'light' | 'dark';
@@ -10,6 +11,10 @@ export interface Prefs {
   window: WindowId;
   /** Minutes between automatic refreshes while the page is visible. 0 turns it off. */
   autoRefreshMinutes: 0 | 5 | 15 | 60;
+  /** Preferred reading language for explanations and stories. */
+  language: string;
+  /** Starting depth in Learn. */
+  layer: 'simple' | 'analogy' | 'how' | 'deep' | 'real-world';
 }
 
 export const DEFAULT_PREFS: Prefs = {
@@ -19,6 +24,8 @@ export const DEFAULT_PREFS: Prefs = {
   hiddenGroups: [],
   window: 'all',
   autoRefreshMinutes: 0,
+  language: 'en',
+  layer: 'simple',
 };
 
 export const PREFS_COOKIE = 'signal_prefs';
@@ -36,6 +43,8 @@ export function parsePrefs(raw: string | undefined | null): Prefs {
       hiddenGroups: Array.isArray(v.hiddenGroups) ? v.hiddenGroups.filter((g) => GROUPS.includes(g)) : [],
       window: v.window === '24h' || v.window === '7d' || v.window === '30d' ? v.window : 'all',
       autoRefreshMinutes: v.autoRefreshMinutes === 5 || v.autoRefreshMinutes === 15 || v.autoRefreshMinutes === 60 ? v.autoRefreshMinutes : 0,
+      language: UI_LANGUAGES.some((l) => l.code === v.language) ? (v.language as string) : 'en',
+      layer: v.layer === 'analogy' || v.layer === 'how' || v.layer === 'deep' || v.layer === 'real-world' ? v.layer : 'simple',
     };
   } catch {
     return DEFAULT_PREFS;
