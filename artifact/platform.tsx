@@ -10,9 +10,13 @@ import { DEFAULT_QUERY, parseQuery, type FeedQuery } from '@/lib/feed/query';
 import { SCOPES } from '@/lib/feed/scopes';
 import { applyPrefsToDocument, parsePrefs, type Prefs } from '@/lib/prefs';
 import type { Snapshot } from '@/lib/types';
+import { HOUR, nextDiscoveryRun } from '@/lib/utils/time';
 import { createBookmarkStore, localStoragePersistence, type BookmarkPersistence, type BookmarkState } from '@/lib/client/bookmarks';
 
 export const PLATFORM: 'web' | 'artifact' = 'artifact';
+
+/** Set by the static-site build: the same page, republished by the pipeline after every run. */
+export const HOSTED_SITE = Boolean((window as unknown as { __SIGNAL_SITE__?: boolean }).__SIGNAL_SITE__);
 
 type Load = { state: 'loading' } | { state: 'ready'; snapshot: Snapshot; loadedAt: string } | { state: 'error'; message: string };
 
@@ -130,6 +134,16 @@ export async function loadSnapshot(manual = false) {
     if (!res.ok) throw new Error(`The snapshot file returned HTTP ${res.status}.`);
     const snapshot = (await res.json()) as Snapshot;
     if (snapshot?.schemaVersion !== 1 || !Array.isArray(snapshot.discoveries)) throw new Error('The snapshot file is not in the expected format.');
+    if (HOSTED_SITE) {
+      // On the self-updating site, freshness is judged when the page is viewed, not when the file was written.
+      const finished = snapshot.status.lastIngestion?.finishedAt;
+      snapshot.status = {
+        ...snapshot.status,
+        storage: 'site',
+        stale: snapshot.status.dataMode === 'ingested' && (!finished || Date.now() - new Date(finished).getTime() > 7 * HOUR),
+        nextScheduledIngestion: nextDiscoveryRun(new Date()).toISOString(),
+      };
+    }
     set({ load: { state: 'ready', snapshot, loadedAt: new Date().toISOString() }, refreshing: false });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';

@@ -148,7 +148,7 @@ export function SettingsView({ platform }: { platform: 'web' | 'artifact' }) {
         title="Refresh"
         hint={platform === 'web'
           ? 'Reloads the page data while this tab is visible. New data only appears after the pipeline runs, every three hours.'
-          : 'Reloads the snapshot file while this tab is visible. The snapshot itself only changes when a new one is published.'}
+          : 'Reloads the published data file while this tab is visible. The data only changes when a new run is published.'}
       >
         <div className="flex flex-wrap items-center gap-3">
           <div className="scroll-x max-w-full">

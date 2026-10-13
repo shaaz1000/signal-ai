@@ -8,14 +8,15 @@ It is not a news site. It watches GitHub, Hacker News, Lobsters, arXiv, Hugging 
 
 **Discover early. Verify carefully. Explain clearly.**
 
-There are two deliverables in this repository:
+There are three ways to run it, all from this repository:
 
 | | What it is | Data |
 |---|---|---|
 | **Next.js application** | The deployable product: server-rendered pages, JSON API, scheduled ingestion. | Live from Postgres, refreshed every three hours by GitHub Actions. |
-| **Claude Artifact** | The same interface built into one HTML page (`npm run build:artifact`). | A timestamped snapshot file. The Artifact sandbox blocks all outside network access, so it cannot ingest anything itself, and says so on the page. |
+| **Static site** | The same interface as one HTML page on GitHub Pages. | Rebuilt and republished by the scheduled workflow after every run, so it stays current with no machine switched on. |
+| **Claude Artifact** | That same page published on claude.ai (`npm run build:artifact`). | A timestamped snapshot file. The Artifact sandbox blocks all outside network access, so it cannot update itself, and says so on the page. |
 
-Both are built from the same React components, types and feed logic.
+All three are built from the same React components, types and feed logic.
 
 ## Quick start
 
@@ -47,7 +48,7 @@ No network? `npm run seed:fixtures` fills an **empty** database with a small fic
 | `npm run status` | Print pipeline status as JSON |
 | `npm run db:generate` / `db:migrate` | Generate a migration from the schema / apply migrations |
 | `npm run export:snapshot` | Write `public/data/snapshot.json` for the Artifact |
-| `npm run build:artifact` | Build `dist/artifact/signal-ai.html` + `snapshot.json` |
+| `npm run build:artifact` | Build `dist/artifact/signal-ai.html` + `snapshot.json`. Add `-- --site dist/site` for the static-site version. |
 | `npm run preview:artifact` | Serve the built Artifact locally the way the Artifact host does |
 | `npm run lint` / `typecheck` / `test` / `test:e2e` | ESLint, `tsc`, Vitest (unit + integration), Playwright (desktop, tablet, phone) |
 

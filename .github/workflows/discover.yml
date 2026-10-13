@@ -17,6 +17,8 @@ jobs:
     uses: ./.github/workflows/pipeline.yml
     permissions:
       contents: write
+      pages: write
+      id-token: write
     secrets: inherit
     with:
       commands: discover verify rank curate

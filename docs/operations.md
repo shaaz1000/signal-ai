@@ -19,6 +19,18 @@ GitHub starts scheduled workflows on a best-effort basis: runs can be delayed at
 
 **Embedded (zero infrastructure).** With no `DATABASE_URL` secret, the workflow restores an embedded Postgres store from the `data` branch, runs the pipeline, and force-pushes the updated store and a fresh `snapshot.json` back as a single commit. Star velocity still comes from real snapshots because the store persists between runs. This mode keeps the pipeline running with no accounts to set up, but a deployed Next.js app cannot read it; use it to keep data accumulating and to produce snapshots for the Artifact until a database is connected.
 
+## The self-updating static site (GitHub Pages)
+
+The pipeline workflow can republish the interface as a static page after every run. It is the Artifact page built as a complete document, with the latest `snapshot.json` beside it, so it needs no server and no database host.
+
+1. Repository **Settings → Pages → Source: GitHub Actions** (or `gh api -X POST repos/OWNER/REPO/pages -f build_type=workflow`).
+2. Set the repository variable `PUBLISH_SITE=true` (`gh variable set PUBLISH_SITE --body true`).
+3. Run `gh workflow run discover.yml`, or wait for the next scheduled run.
+
+The site then updates every three hours on GitHub's schedule. It shows the last ingestion time, the next scheduled run, and a stale warning if two runs are missed. Bookmarks and settings there are stored in the visitor's browser.
+
+GitHub Pages on a private repository needs a paid plan; on a public repository it is free.
+
 ## Deploying the app
 
 1. Create a Postgres database (a Supabase project works; use the pooler connection string).
@@ -34,7 +46,7 @@ npm run export:snapshot      # from the database you want to publish
 npm run build:artifact       # dist/artifact/signal-ai.html + snapshot.json
 ```
 
-Publish `signal-ai.html` with `snapshot.json` as a supporting file. The Artifact shows the ingestion time of its snapshot on every page and marks it as old after 24 hours. It cannot refresh itself: the Artifact sandbox blocks requests to every host except the page's own files.
+Publish `signal-ai.html` with `snapshot.json` as a supporting file. The latest pipeline snapshot is always available on the `data` branch (`snapshot.json`). The Artifact shows the ingestion time of its snapshot on every page and marks it as old after 24 hours. It cannot refresh itself: the Artifact sandbox blocks requests to every host except the page's own files. For a page that stays current unattended, use the static site above.
 
 ## When something goes wrong
 

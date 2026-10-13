@@ -226,7 +226,8 @@ export interface StatusView {
   stale: boolean;
   /** `fixture` when every record came from the fixture seeder. */
   dataMode: 'ingested' | 'fixture' | 'empty';
-  storage: 'postgres' | 'pglite' | 'snapshot';
+  /** `snapshot`: a fixed export (the Claude Artifact). `site`: the static site the pipeline republishes after every run. */
+  storage: 'postgres' | 'pglite' | 'snapshot' | 'site';
 }
 
 export interface WeeklyEdition {

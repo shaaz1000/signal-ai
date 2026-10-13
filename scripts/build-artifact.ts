@@ -67,6 +67,29 @@ async function main() {
 <script>${js}</script>
 `;
   await writeFile(path.join(out, 'signal-ai.html'), html);
+
+  // --site <dir>: the same page as a complete document for static hosting (GitHub Pages).
+  const site = arg('--site');
+  if (site) {
+    const dir = path.resolve(root, site);
+    await mkdir(dir, { recursive: true });
+    const page = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="What people are building, releasing and testing across AI and emerging technology, with the evidence behind each item.">
+</head>
+<body>
+<script>window.__SIGNAL_SITE__ = true;</script>
+${html}</body>
+</html>
+`;
+    await writeFile(path.join(dir, 'index.html'), page);
+    await copyFile(snapshotSource, path.join(dir, 'snapshot.json'));
+    await writeFile(path.join(dir, '.nojekyll'), '');
+    console.log(`Built static site in ${path.relative(root, dir)}/`);
+  }
   await copyFile(snapshotSource, path.join(out, 'snapshot.json'));
   const kb = (n: number) => `${Math.round(n / 1024)} KB`;
   console.log(`Built ${path.relative(root, out)}/signal-ai.html (${kb(html.length)}: css ${kb(css.length)}, js ${kb(js.length)}) and snapshot.json (${kb((await stat(snapshotSource)).size)})`);

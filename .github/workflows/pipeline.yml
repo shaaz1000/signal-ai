@@ -89,16 +89,49 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Export snapshot
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/data"
+          npx tsx scripts/run.ts export "$RUNNER_TEMP/data/snapshot.json"
+
+      # The static site is the Artifact page as a complete document. Republishing it
+      # after every run is what keeps a public page current with no machine switched on.
+      - name: Build static site
+        if: always() && vars.PUBLISH_SITE == 'true'
+        run: npx tsx scripts/build-artifact.ts --snapshot "$RUNNER_TEMP/data/snapshot.json" --out "$RUNNER_TEMP/artifact" --site "$RUNNER_TEMP/site"
+
+      - name: Upload static site
+        if: always() && vars.PUBLISH_SITE == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ runner.temp }}/site
+
       - name: Save embedded store and snapshot to the data branch
         if: always() && env.DATABASE_URL == ''
         run: |
           out="$RUNNER_TEMP/data"
-          mkdir -p "$out"
           npm run datastore -- pack "$out/store.tar.gz"
-          npx tsx scripts/run.ts export "$out/snapshot.json"
           cd "$out"
           git init -q -b data
           git add store.tar.gz snapshot.json
           git -c user.name="signal-pipeline" -c user.email="actions@users.noreply.github.com" commit -q -m "data: pipeline state $(date -u +%Y-%m-%dT%H:%MZ)"
           # A single-commit branch, replaced each run, so history does not accumulate binary blobs.
           git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" data
+
+  publish-site:
+    name: Publish static site
+    # Opt-in: set the repository variable PUBLISH_SITE=true and enable GitHub Pages (source: GitHub Actions).
+    if: always() && vars.PUBLISH_SITE == 'true'
+    needs: run
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
