@@ -1,7 +1,8 @@
 import Link from 'next/link';
-import { Activity, ArrowUpRight, ChevronLeft, CircleCheck, CircleHelp, CircleX, TriangleAlert } from 'lucide-react';
+import { Activity, ArrowUpRight, BookOpen, ChevronLeft, CircleCheck, CircleHelp, CircleX, PenLine, TriangleAlert } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { categoryName, CLAIM_LABELS, EXECUTION_LABELS, type CheckOutcome, type DiscoveryView } from '@/lib/types';
+import { EVIDENCE_STAGES, industryName, type EvidenceStage } from '@/lib/industries';
 import { DEFAULT_WEIGHTS } from '@/lib/scoring/weights';
 import { fmtInt } from '@/lib/utils/text';
 import { dateTime, shortDate } from '@/lib/utils/time';
@@ -76,9 +77,25 @@ export function DetailView({ d, now, backHref = '/discover' }: { d: DiscoveryVie
           <ExternalLink href={d.canonicalUrl} className="btn btn-primary">
             Open original <ArrowUpRight size={15} aria-hidden="true" />
           </ExternalLink>
+          <Link href={`/learn/${d.id}`} className="btn"><BookOpen size={15} aria-hidden="true" /> Understand how it works</Link>
+          <Link href={`/studio/${d.id}`} className="btn"><PenLine size={15} aria-hidden="true" /> Create content</Link>
           <BookmarkButton item={d} variant="button" />
           <CopyLinkButton />
         </div>
+        {d.industries.length || d.evidenceStage ? (
+          <dl className="mt-4 flex flex-wrap gap-x-7 gap-y-2 t-meta">
+            {d.industries.length ? <div><dt className="inline">Industries </dt><dd className="inline text-fg">{d.industries.map(industryName).join(', ')}</dd></div> : null}
+            {d.evidenceStage ? (
+              <div>
+                <dt className="inline">Stated maturity </dt>
+                <dd className="inline text-fg">
+                  {EVIDENCE_STAGES[d.evidenceStage.stage as EvidenceStage] ?? d.evidenceStage.stage}
+                  {d.evidenceStage.cue ? ` (source says “${d.evidenceStage.cue}”)` : ' (implied by the type of source)'}
+                </dd>
+              </div>
+            ) : null}
+          </dl>
+        ) : null}
       </header>
 
       {d.fixture ? <div className="mb-6"><Notice tone="warn">Demonstration record. It was created by the fixture seeder for interface development and does not describe a real project.</Notice></div> : null}
@@ -163,6 +180,22 @@ export function DetailView({ d, now, backHref = '/discover' }: { d: DiscoveryVie
               ))}
             </dl>
           </Panel>
+
+          {d.model ? (
+            <Panel title="Model">
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-3 t-meta">
+                <div><dt>Publisher</dt><dd className="text-fg break-anywhere">{d.model.vendor ?? 'Not stated'}</dd></div>
+                <div><dt>Weights</dt><dd className="text-fg">{d.model.openWeights === true ? 'Downloadable' : d.model.openWeights === false ? 'Not public' : 'Not stated'}</dd></div>
+                <div><dt>Licence</dt><dd className="text-fg break-anywhere">{d.model.license ?? 'Not stated'}</dd></div>
+                <div><dt>Modalities</dt><dd className="text-fg">{d.model.modalities.length ? d.model.modalities.join(', ') : 'Not stated'}</dd></div>
+              </dl>
+              <p className="t-meta mt-4">
+                {d.model.independentlyTested
+                  ? 'The sources describe independent testing.'
+                  : 'Capabilities, benchmarks and prices here are the publisher’s statements. No independent test is on record.'}
+              </p>
+            </Panel>
+          ) : null}
 
           {d.repo ? (
             <Panel title="Repository">

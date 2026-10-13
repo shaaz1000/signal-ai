@@ -21,4 +21,4 @@ jobs:
       id-token: write
     secrets: inherit
     with:
-      commands: discover verify rank curate
+      commands: discover verify rank trends curate

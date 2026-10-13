@@ -106,3 +106,84 @@ export function useRefresh() {
   const refresh = useCallback(() => startTransition(() => router.refresh()), [router]);
   return { refresh, refreshing };
 }
+
+/** Loads a bundled language as its own chunk the first time it is chosen. */
+export async function loadLanguage(code: string): Promise<void> {
+  const { registerBundled } = await import('@/lib/i18n/bundled');
+  if (code === 'hi') registerBundled('hi', await import('@/lib/i18n/bundled.hi').then((m) => ({ ui: m.HI_INTERFACE, content: m.HI_CONTENT })));
+  if (code === 'hinglish') registerBundled('hinglish', await import('@/lib/i18n/bundled.hinglish').then((m) => ({ ui: m.HINGLISH_INTERFACE, content: m.HINGLISH_CONTENT })));
+}
+
+// ── Account and protected generation (server-backed; unavailable on the static builds) ──
+
+export interface Account {
+  signedIn: boolean;
+  name?: string | null;
+  plan?: string;
+  translationAvailable: boolean;
+  generationAvailable: boolean;
+}
+export type RemoteResult<T> = ({ ok: true } & T) | { ok: false; code: string; message: string };
+
+/** Whether this host has a backend that can translate and generate on request. */
+export const HAS_BACKEND = true;
+
+let accountPromise: Promise<Account | null> | null = null;
+let account: Account | null = null;
+const accountListeners = new Set<() => void>();
+function loadAccount(force = false): void {
+  if (accountPromise && !force) return;
+  accountPromise = fetch('/api/me', { credentials: 'same-origin' })
+    .then((r) => (r.ok ? (r.json() as Promise<Account>) : null))
+    .catch(() => null)
+    .then((a) => {
+      account = a;
+      accountListeners.forEach((l) => l());
+      return a;
+    });
+}
+
+export function useAccount(): Account | null {
+  return useSyncExternalStore(
+    (l) => {
+      accountListeners.add(l);
+      loadAccount();
+      return () => accountListeners.delete(l);
+    },
+    () => account,
+    () => null,
+  );
+}
+
+export const refreshAccount = () => loadAccount(true);
+
+async function post<T>(url: string, body: unknown, method = 'POST'): Promise<RemoteResult<T>> {
+  try {
+    const res = await fetch(url, { method, credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: method === 'DELETE' ? undefined : JSON.stringify(body) });
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    if (!res.ok) return { ok: false, code: String(data.code ?? res.status), message: String(data.error ?? 'The request could not be completed.') };
+    return { ok: true, ...(data as T) };
+  } catch {
+    return { ok: false, code: 'network', message: 'The server could not be reached. Check your connection and try again.' };
+  }
+}
+
+export interface TranslationPayload {
+  fields: Record<string, string>;
+  language: string;
+  provider: string;
+  model: string;
+}
+export const requestTranslation = (discoveryId: string, language: string) => post<TranslationPayload>('/api/translate', { discoveryId, language });
+export const requestGeneration = (body: { discoveryId: string; kind: 'explanation' | 'story' | 'draft'; variant?: string; language?: string }) =>
+  post<{ payload: unknown; provider: string; model: string }>('/api/generate', body);
+export const signIn = async (token: string) => {
+  const result = await post<Record<string, never>>('/api/session', { token });
+  refreshAccount();
+  return result;
+};
+export const signOut = async () => {
+  const result = await post<Record<string, never>>('/api/session', {}, 'DELETE');
+  refreshAccount();
+  return result;
+};

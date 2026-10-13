@@ -11,7 +11,7 @@ on:
   workflow_call:
     inputs:
       commands:
-        description: Space-separated pipeline commands (discover verify rank curate maintain)
+        description: Space-separated pipeline commands (discover verify rank trends curate maintain)
         required: true
         type: string
 
@@ -41,6 +41,8 @@ jobs:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
       AI_MAX_ITEMS_PER_RUN: ${{ vars.AI_MAX_ITEMS_PER_RUN || '40' }}
+      # Set to 0 for one run to force every record back through verification after a classifier change.
+      VERIFY_MAX_AGE_HOURS: ${{ vars.VERIFY_MAX_AGE_HOURS }}
       NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL || format('https://github.com/{0}', github.repository) }}
     steps:
       - uses: actions/checkout@v4
@@ -69,7 +71,7 @@ jobs:
           status=0
           for command in $COMMANDS; do
             case "$command" in
-              discover|verify|rank|curate|maintain) ;;
+              discover|verify|rank|trends|curate|maintain) ;;
               *) echo "Unknown command: $command"; exit 2 ;;
             esac
             echo "::group::$command"

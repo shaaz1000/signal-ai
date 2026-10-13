@@ -1,33 +1,44 @@
 'use client';
 
 import Link from 'next/link';
-import { Bookmark, CalendarDays, Compass, Ellipsis, FlaskConical, Gem, Newspaper, Radar, Settings, SignalHigh } from 'lucide-react';
+import { Bookmark, BookOpen, Boxes, Building2, Clapperboard, Compass, Ellipsis, FlaskConical, Newspaper, Radar, Settings, SignalHigh, TrendingUp } from 'lucide-react';
 import { useEffect, type ReactNode } from 'react';
 import { QuickSearch, ThemeToggle } from '@/components/ui/controls';
 import { usePrefs, useRefresh, useRememberedHref, useRoutePath } from '@/lib/client/platform';
 import type { StatusView } from '@/lib/types';
 import { relativeTime } from '@/lib/utils/time';
 
-const PRIMARY = [
-  { href: '/', label: 'Today', Icon: Newspaper },
-  { href: '/discover', label: 'Discover', Icon: Compass },
-  { href: '/radar', label: 'GitHub Radar', Icon: Radar },
-  { href: '/research', label: 'Research Lab', Icon: FlaskConical },
-  { href: '/gems', label: 'Hidden Gems', Icon: Gem },
-  { href: '/weekly', label: 'What You Missed', Icon: CalendarDays },
-];
-const LIBRARY = [
-  { href: '/bookmarks', label: 'Saved', Icon: Bookmark },
-  { href: '/settings', label: 'Settings', Icon: Settings },
+// Eleven destinations in four groups, so the sidebar reads as a short list. Hidden Gems and
+// What You Missed live under Discover and on the More page.
+const GROUPS = [
+  { title: null, items: [
+    { href: '/', label: 'Today', Icon: Newspaper },
+    { href: '/discover', label: 'Discover', Icon: Compass },
+    { href: '/trending', label: 'Trending', Icon: TrendingUp },
+  ] },
+  { title: 'Follow', items: [
+    { href: '/models', label: 'AI Models', Icon: Boxes },
+    { href: '/industries', label: 'Industries', Icon: Building2 },
+    { href: '/radar', label: 'GitHub Radar', Icon: Radar },
+    { href: '/research', label: 'Research', Icon: FlaskConical },
+  ] },
+  { title: 'Understand and create', items: [
+    { href: '/learn', label: 'Learn', Icon: BookOpen },
+    { href: '/content', label: 'Content Radar', Icon: Clapperboard },
+  ] },
+  { title: 'Library', items: [
+    { href: '/bookmarks', label: 'Saved', Icon: Bookmark },
+    { href: '/settings', label: 'Settings', Icon: Settings },
+  ] },
 ];
 const TABS = [
   { href: '/', label: 'Today', Icon: Newspaper },
   { href: '/discover', label: 'Discover', Icon: Compass },
-  { href: '/radar', label: 'Radar', Icon: Radar },
-  { href: '/research', label: 'Research', Icon: FlaskConical },
+  { href: '/learn', label: 'Learn', Icon: BookOpen },
+  { href: '/trending', label: 'Trending', Icon: TrendingUp },
   { href: '/more', label: 'More', Icon: Ellipsis },
 ];
-const MORE_PATHS = ['/more', '/gems', '/weekly', '/bookmarks', '/settings', '/status'];
+const TAB_PATHS = ['/', '/discover', '/learn', '/trending'];
 
 const isActive = (path: string, href: string) => (href === '/' ? path === '/' : path === href || path.startsWith(`${href}/`));
 
@@ -46,7 +57,8 @@ function NavItem({ href, label, Icon, path }: { href: string; label: string; Ico
 
 function TabItem({ href, label, Icon, path }: { href: string; label: string; Icon: typeof Newspaper; path: string }) {
   const remembered = useRememberedHref(href);
-  const active = href === '/more' ? MORE_PATHS.some((p) => isActive(path, p)) : isActive(path, href);
+  // Anything without its own tab belongs to More.
+  const active = href === '/more' ? !TAB_PATHS.some((p) => isActive(path, p)) && !path.startsWith('/d/') : isActive(path, href);
   return (
     <li className="flex flex-1">
       <Link href={remembered} className="tab-link" aria-current={active ? 'page' : undefined}>
@@ -109,12 +121,13 @@ export function Shell({ status, now, children }: { status: StatusView | null; no
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-[248px] flex-col border-r border-sepsoft bg-bg px-4 pb-4 pt-6 lg:flex">
         <div className="px-2"><Wordmark /></div>
         <div className="mt-5"><QuickSearch id="nav-search" /></div>
-        <nav aria-label="Sections" className="mt-5 flex flex-1 flex-col gap-6 overflow-y-auto">
-          <ul className="flex flex-col gap-0.5">{PRIMARY.map((item) => <NavItem key={item.href} {...item} path={path} />)}</ul>
-          <div>
-            <h2 className="mb-1.5 px-3 text-xs font-semibold text-fg2">Library</h2>
-            <ul className="flex flex-col gap-0.5">{LIBRARY.map((item) => <NavItem key={item.href} {...item} path={path} />)}</ul>
-          </div>
+        <nav aria-label="Sections" className="mt-5 flex flex-1 flex-col gap-5 overflow-y-auto">
+          {GROUPS.map((group) => (
+            <div key={group.title ?? 'main'}>
+              {group.title ? <h2 className="mb-1.5 px-3 text-xs font-semibold text-fg2">{group.title}</h2> : null}
+              <ul className="flex flex-col gap-0.5">{group.items.map((item) => <NavItem key={item.href} {...item} path={path} />)}</ul>
+            </div>
+          ))}
         </nav>
         <div className="flex items-center justify-between gap-1 border-t border-sepsoft pt-3">
           <div className="min-w-0 flex-1">{statusLink}</div>

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Segmented } from '@/components/ui/controls';
 import { useQueryNav } from '@/lib/client/platform';
 import { ACTIVITY, isDefaultQuery, REPO_AGES, SORTS, WINDOWS, type FeedQuery, type SortId } from '@/lib/feed/query';
+import { INDUSTRIES } from '@/lib/industries';
 import { CATEGORIES } from '@/lib/types';
 
 interface Props {
@@ -16,10 +17,12 @@ interface Props {
   languages?: string[];
   sorts?: SortId[];
   showCategories?: boolean;
+  /** Show the industry chooser (Industries page). */
+  showIndustries?: boolean;
   searchLabel?: string;
 }
 
-export function FilterBar({ query, defaults = {}, total, mode = 'feed', languages = [], sorts, showCategories = true, searchLabel = 'Search titles, descriptions, tags and repository names' }: Props) {
+export function FilterBar({ query, defaults = {}, total, mode = 'feed', languages = [], sorts, showCategories = true, showIndustries = false, searchLabel = 'Search titles, descriptions, tags and repository names' }: Props) {
   const { setQuery, reset, pending } = useQueryNav(defaults);
   const [text, setText] = useState(query.q);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -109,6 +112,19 @@ export function FilterBar({ query, defaults = {}, total, mode = 'feed', language
             {CATEGORIES.map((c) => (
               <button key={c.id} type="button" className="chip" aria-pressed={query.category === c.id} onClick={() => setQuery({ category: query.category === c.id ? 'all' : c.id })}>
                 {c.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {showIndustries ? (
+        <div className="scroll-x -mx-4 px-4 sm:mx-0 sm:px-0">
+          <div role="group" aria-label="Industry" className="flex w-max gap-2 sm:w-auto sm:flex-wrap">
+            <button type="button" className="chip" aria-pressed={query.industry === ''} onClick={() => setQuery({ industry: '' })}>All industries</button>
+            {INDUSTRIES.map((i) => (
+              <button key={i.id} type="button" className="chip" aria-pressed={query.industry === i.id} onClick={() => setQuery({ industry: query.industry === i.id ? '' : i.id })}>
+                {i.name}
               </button>
             ))}
           </div>

@@ -29,7 +29,10 @@
     "datastore": "tsx scripts/datastore.ts",
     "build:artifact": "tsx scripts/build-artifact.ts",
     "audit": "npm audit --omit=dev --audit-level=high",
-    "preview:artifact": "tsx scripts/preview-artifact.ts"
+    "preview:artifact": "tsx scripts/preview-artifact.ts",
+    "i18n:extract": "tsx scripts/i18n-extract.ts",
+    "trends": "tsx scripts/run.ts trends",
+    "admin": "tsx scripts/admin.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",

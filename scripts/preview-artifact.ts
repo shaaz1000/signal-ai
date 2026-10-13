@@ -22,6 +22,10 @@ createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', 'http://localhost');
   try {
     if (url.pathname === '/health') return void res.writeHead(200).end('ok');
+    if (/^\/lang-[a-z]+\.json$/.test(url.pathname)) {
+      res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+      return void res.end(await readFile(path.join(dir, url.pathname.slice(1))));
+    }
     if (url.pathname === '/snapshot.json') {
       res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
       return void res.end(await readFile(path.join(dir, 'snapshot.json')));

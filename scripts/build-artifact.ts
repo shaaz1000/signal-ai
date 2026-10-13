@@ -71,6 +71,11 @@ async function main() {
 <script>${js}</script>
 `;
   await writeFile(path.join(out, 'signal-ai.html'), html);
+  // Bundled languages ship as their own files and are fetched only when chosen.
+  const { HI_INTERFACE, HI_CONTENT } = await import('@/lib/i18n/bundled.hi');
+  const { HINGLISH_INTERFACE, HINGLISH_CONTENT } = await import('@/lib/i18n/bundled.hinglish');
+  const languages = { hi: { ui: HI_INTERFACE, content: HI_CONTENT }, hinglish: { ui: HINGLISH_INTERFACE, content: HINGLISH_CONTENT } };
+  for (const [code, data] of Object.entries(languages)) await writeFile(path.join(out, `lang-${code}.json`), JSON.stringify(data));
 
   // --site <dir>: the same page as a complete document for static hosting (GitHub Pages).
   const site = arg('--site');
@@ -91,6 +96,7 @@ ${html}</body>
 `;
     await writeFile(path.join(dir, 'index.html'), page);
     await copyFile(snapshotSource, path.join(dir, 'snapshot.json'));
+    for (const code of Object.keys(languages)) await copyFile(path.join(out, `lang-${code}.json`), path.join(dir, `lang-${code}.json`));
     await writeFile(path.join(dir, '.nojekyll'), '');
     console.log(`Built static site in ${path.relative(root, dir)}/`);
   }

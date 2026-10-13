@@ -9,13 +9,14 @@ interface Props {
   searchParams: SearchParams;
   title: string;
   lede: string;
-  layout?: 'cards' | 'repos';
+  layout?: 'cards' | 'repos' | 'content';
   showCategories?: boolean;
+  showIndustries?: boolean;
   note?: ReactNode;
 }
 
 /** Shared server component behind Discover, Radar, Research Lab, Hidden Gems and Unverified. */
-export async function FeedPage({ scope, searchParams, title, lede, layout, showCategories, note }: Props) {
+export async function FeedPage({ scope, searchParams, title, lede, layout, showCategories, showIndustries, note }: Props) {
   const [params, prefs, data] = await Promise.all([searchParams, getPrefs(), getFeedData()]);
   const config: ScopeConfig = SCOPES[scope];
   const defaults = { ...config.defaults, window: prefs.window };
@@ -25,7 +26,7 @@ export async function FeedPage({ scope, searchParams, title, lede, layout, showC
   return (
     <FeedView
       title={title} lede={lede} result={result} query={query} defaults={defaults} now={now} layout={layout}
-      sorts={config.sorts} showCategories={showCategories} status={data.status} note={note}
+      sorts={config.sorts} showCategories={showCategories} showIndustries={showIndustries} status={data.status} note={note}
     />
   );
 }

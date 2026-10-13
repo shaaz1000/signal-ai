@@ -11,6 +11,7 @@ import { SCOPES } from '@/lib/feed/scopes';
 import { applyPrefsToDocument, parsePrefs, type Prefs } from '@/lib/prefs';
 import type { Snapshot } from '@/lib/types';
 import { HOUR, nextDiscoveryRun } from '@/lib/utils/time';
+import { registerBundled } from '@/lib/i18n/bundled';
 import { createBookmarkStore, localStoragePersistence, type BookmarkPersistence, type BookmarkState } from '@/lib/client/bookmarks';
 
 export const PLATFORM: 'web' | 'artifact' = 'artifact';
@@ -53,7 +54,8 @@ export function pathToToken(path: string): string {
 export function tokenToPath(token: string): string {
   const t = token.replace(/^#/, '');
   if (!t || t === 'today') return '/';
-  if (/^d-[a-f0-9]{12}$/.test(t)) return `/d/${t.slice(2)}`;
+  const item = t.match(/^(d|learn|studio)-([a-f0-9]{12})$/);
+  if (item) return `/${item[1]}/${item[2]}`;
   return /^[a-z]+$/.test(t) ? `/${t}` : '/';
 }
 
@@ -253,3 +255,44 @@ export function useBookmarks() {
   useStore((s) => s.prefs); // Re-render when the storage location becomes known.
   return { state: bookmarks, store: bookmarkStore };
 }
+
+/** Bundled languages are separate files beside the page, fetched the first time one is chosen. */
+const languageLoads = new Map<string, Promise<void>>();
+export function loadLanguage(code: string): Promise<void> {
+  if (code !== 'hi' && code !== 'hinglish') return Promise.resolve();
+  let pending = languageLoads.get(code);
+  if (!pending) {
+    pending = fetch(`lang-${code}.json`)
+      .then((r) => (r.ok ? (r.json() as Promise<{ ui: Record<string, string>; content: Record<string, string> }>) : Promise.reject(new Error(String(r.status)))))
+      .then((data) => registerBundled(code, data))
+      // A failed load leaves the page in English and can be retried by choosing the language again.
+      .catch(() => void languageLoads.delete(code));
+    languageLoads.set(code, pending);
+  }
+  return pending;
+}
+
+// ── Account and generation: this build has no server, so nothing can be generated on request ──
+
+export interface Account {
+  signedIn: boolean;
+  name?: string | null;
+  plan?: string;
+  translationAvailable: boolean;
+  generationAvailable: boolean;
+}
+export type RemoteResult<T> = ({ ok: true } & T) | { ok: false; code: string; message: string };
+export interface TranslationPayload {
+  fields: Record<string, string>;
+  language: string;
+  provider: string;
+  model: string;
+}
+export const HAS_BACKEND = false;
+const NO_SERVER = { ok: false as const, code: 'static', message: 'This page has no server behind it, so it can only show translations and drafts that were prepared in advance.' };
+export const useAccount = (): Account | null => null;
+export const refreshAccount = (): void => undefined;
+export const requestTranslation = async (_discoveryId: string, _language: string): Promise<RemoteResult<TranslationPayload>> => NO_SERVER;
+export const requestGeneration = async (_body: unknown): Promise<RemoteResult<{ payload: unknown; provider: string; model: string }>> => NO_SERVER;
+export const signIn = async (_token: string): Promise<RemoteResult<Record<string, never>>> => NO_SERVER;
+export const signOut = async (): Promise<RemoteResult<Record<string, never>>> => NO_SERVER;

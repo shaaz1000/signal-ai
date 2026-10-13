@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react';
-import { DetailView } from '@/components/discovery/detail';
 import { Shell } from '@/components/navigation/shell';
 import { RefreshButton } from '@/components/ui/controls';
 import { EmptyState, ErrorState, Notice, PageHeader, PageSkeleton } from '@/components/ui/primitives';
 import { FeedView, Freshness, MoreView, TodayView, WeeklyView } from '@/components/views/feeds';
+import { AccountView } from '@/components/views/account';
+import { ArticleView, LearnDetailView, StudioView, TrendingView } from '@/components/views/learn';
 import { BookmarksView, SettingsView, StatusPanel } from '@/components/views/library';
 import { buildToday, queryFeed } from '@/lib/feed/query';
 import { SCOPES, type ScopeConfig, type ScopeId } from '@/lib/feed/scopes';
@@ -11,7 +12,19 @@ import type { Snapshot } from '@/lib/types';
 import Link from './shims/next-link';
 import { loadSnapshot, queryFor, useStore } from './platform';
 
-const FEEDS: Record<string, { scope: ScopeId; title: string; lede: string; layout?: 'cards' | 'repos'; showCategories?: boolean; note?: ReactNode }> = {
+const FEEDS: Record<string, { scope: ScopeId; title: string; lede: string; layout?: 'cards' | 'repos' | 'content'; showCategories?: boolean; showIndustries?: boolean; note?: ReactNode }> = {
+  '/models': {
+    scope: 'models', title: 'AI Models', showCategories: false,
+    lede: 'New model releases from labs and independent publishers: who published it, whether the weights can be downloaded, the licence and the stated modalities.',
+    note: <Notice>Capabilities, benchmark results and prices on a release are the publisher’s statements until someone else tests them. Each card says which it is.</Notice>,
+  },
+  '/industries': {
+    scope: 'industries', title: 'Industries', showCategories: false, showIndustries: true,
+    lede: 'How AI is being applied outside the lab. Choose an industry to narrow the list.',
+    note: <Notice>For medicine and defence, each item shows how far along it says it is. Where the source does not say, nothing is assumed.</Notice>,
+  },
+  '/learn': { scope: 'learn', title: 'Learn', lede: 'Discoveries you can take apart. Open one, choose “Understand how it works”, and read it at five depths, step through a diagram, or play it as a story.' },
+  '/content': { scope: 'content', title: 'Content Radar', layout: 'content', lede: 'Verified stories ranked by how well they can be explained: new, with a documented mechanism or a general explainer, and not yet covered everywhere. Unverified items never appear here.' },
   '/discover': { scope: 'discover', title: 'Discover', lede: 'Every verified discovery, across tools, agents, models, research, robotics, creative work and browser experiments.' },
   '/radar': { scope: 'radar', title: 'GitHub Radar', layout: 'repos', showCategories: false, lede: 'Repositories gaining momentum. Growth is measured between our own snapshots; where only one snapshot exists you see the average since creation, labelled as such.' },
   '/research': {
@@ -40,19 +53,31 @@ function Page({ snapshot, path, now }: { snapshot: Snapshot; path: string; now: 
     return (
       <FeedView
         title={feed.title} lede={feed.lede} result={queryFeed(discoveries, query, now, prefs, config)} query={query} defaults={defaults} now={now}
-        layout={feed.layout} sorts={config.sorts} showCategories={feed.showCategories} status={status} note={feed.note}
+        layout={feed.layout} sorts={config.sorts} showCategories={feed.showCategories} showIndustries={feed.showIndustries} status={status} note={feed.note}
       />
     );
   }
   if (path.startsWith('/d/')) {
     const d = discoveries.find((x) => x.id === path.slice(3));
-    if (d) return <DetailView d={d} now={now} backHref={d.kind === 'repository' ? '/radar' : '/discover'} />;
+    if (d) {
+      const generated = Object.fromEntries(Object.entries(snapshot.generated ?? {}).filter(([, r]) => r.subject === `discovery:${d.id}`));
+      return <ArticleView key={d.id} d={d} generated={generated} now={now} backHref={d.kind === 'repository' ? '/radar' : '/discover'} />;
+    }
     return (
       <EmptyState title="That discovery is not in this snapshot" action={<Link href="/discover" className="btn btn-primary">Browse discoveries</Link>}>
         The link may be from a newer or older snapshot than the one published here.
       </EmptyState>
     );
   }
+  if (path.startsWith('/learn/') || path.startsWith('/studio/')) {
+    const [, section, id] = path.split('/');
+    const d = discoveries.find((x) => x.id === id);
+    if (!d) return <EmptyState title="That discovery is not in this snapshot" action={<Link href="/learn" className="btn btn-primary">Browse Learn</Link>} />;
+    const generated = Object.fromEntries(Object.entries(snapshot.generated ?? {}).filter(([, r]) => r.subject === `discovery:${id}`));
+    return section === 'learn' ? <LearnDetailView key={id} d={d} generated={generated} now={now} /> : <StudioView key={id} d={d} />;
+  }
+  if (path === '/trending') return <TrendingView trends={snapshot.trends ?? []} items={discoveries} />;
+  if (path === '/account') return <AccountView />;
   if (path === '/weekly') return <WeeklyView weekly={snapshot.weekly} items={discoveries} now={now} status={status} />;
   if (path === '/bookmarks') return <BookmarksView now={now} />;
   if (path === '/settings') return <SettingsView platform="artifact" />;

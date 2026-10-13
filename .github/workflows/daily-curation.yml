@@ -18,4 +18,4 @@ jobs:
       id-token: write
     secrets: inherit
     with:
-      commands: rank curate
+      commands: rank trends curate

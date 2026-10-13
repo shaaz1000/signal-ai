@@ -1,7 +1,8 @@
 import { defineConfig } from '@playwright/test';
 
 const CI = Boolean(process.env.CI);
-const env = { PGLITE_DIR: '.data/e2e', DATABASE_URL: '', LOG_SILENT: '1' };
+// Every test worker shares one address, so the per-client API limit is lifted for the test server only.
+const env = { PGLITE_DIR: '.data/e2e', DATABASE_URL: '', LOG_SILENT: '1', API_RATE_LIMIT: '100000' };
 
 export default defineConfig({
   testDir: 'tests/e2e',

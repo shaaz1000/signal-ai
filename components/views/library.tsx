@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Trash2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { RefreshButton, Segmented } from '@/components/ui/controls';
+import { LanguageSwitcher } from '@/components/views/learn';
 import { EmptyState, ExternalLink, PageHeader, Rule } from '@/components/ui/primitives';
 import { useBookmarks, usePrefs } from '@/lib/client/platform';
 import { DEFAULT_COLLECTION } from '@/lib/client/bookmarks';
@@ -130,6 +131,9 @@ export function SettingsView({ platform }: { platform: 'web' | 'artifact' }) {
           <div className="scroll-x max-w-full"><Segmented label="Theme" options={THEME_OPTIONS} value={prefs.theme} onChange={(theme) => setPrefs({ theme })} /></div>
           <div className="scroll-x max-w-full"><Segmented label="Content density" options={DENSITY_OPTIONS} value={prefs.density} onChange={(density) => setPrefs({ density })} /></div>
         </div>
+      </Setting>
+      <Setting title="Language" hint="Used for explanations, Story Mode and diagram labels. English, Hindi and Hinglish ship with the app; text taken from sources stays in its original language unless a translation has been stored.">
+        <LanguageSwitcher id="settings-language" />
       </Setting>
       <Setting title="Topics" hint="Switch a topic off to remove it from Today and from unfiltered feeds. Choosing it as a filter still shows it.">
         <div className="group-list">

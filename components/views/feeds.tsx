@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { CompactRow, DiscoveryCard, FeaturedStory, RepoRow } from '@/components/discovery/card';
 import { FilterBar, LoadMore } from '@/components/discovery/filter-bar';
+import { ContentRadarList } from '@/components/views/learn';
 import { RefreshButton } from '@/components/ui/controls';
 import { EmptyState, Notice, PageHeader, SectionHeader } from '@/components/ui/primitives';
 import type { FeedQuery, FeedResult, SortId, TodaySections } from '@/lib/feed/query';
@@ -152,14 +153,15 @@ interface FeedViewProps {
   query: FeedQuery;
   defaults?: Partial<FeedQuery>;
   now: string;
-  layout?: 'cards' | 'repos';
+  layout?: 'cards' | 'repos' | 'content';
   sorts?: SortId[];
   showCategories?: boolean;
+  showIndustries?: boolean;
   status: StatusView | null;
   note?: ReactNode;
 }
 
-export function FeedView({ title, lede, result, query, defaults, now, layout = 'cards', sorts, showCategories = true, status, note }: FeedViewProps) {
+export function FeedView({ title, lede, result, query, defaults, now, layout = 'cards', sorts, showCategories = true, showIndustries = false, status, note }: FeedViewProps) {
   const hasData = (status?.counts.total ?? 0) > 0;
   return (
     <>
@@ -167,7 +169,7 @@ export function FeedView({ title, lede, result, query, defaults, now, layout = '
       <div className="mb-5 flex flex-col gap-3 empty:hidden"><Freshness status={status} now={now} level="critical" />{note}</div>
       <FilterBar
         query={query} defaults={defaults} total={result.total} mode={layout === 'repos' ? 'radar' : 'feed'}
-        languages={result.languages} sorts={sorts} showCategories={showCategories}
+        languages={result.languages} sorts={sorts} showCategories={showCategories} showIndustries={showIndustries}
         searchLabel={layout === 'repos' ? 'Search repositories, owners and topics' : undefined}
       />
       {result.items.length === 0 ? (
@@ -176,6 +178,8 @@ export function FeedView({ title, lede, result, query, defaults, now, layout = '
             ? 'Try a wider time window, a different category, or clear the search.'
             : 'The pipeline has not written any records yet.'}
         </EmptyState>
+      ) : layout === 'content' ? (
+        <ContentRadarList items={result.items} />
       ) : layout === 'repos' ? (
         <ul className="group-list">{result.items.map((d) => <li key={d.id}><RepoRow d={d} now={now} /></li>)}</ul>
       ) : (
@@ -219,10 +223,17 @@ export function WeeklyView({ weekly, items, now, status }: { weekly: WeeklyEditi
 }
 
 const MORE_LINKS = [
+  { href: '/trending', title: 'Trending', text: 'Topics gaining or losing ground, from stored snapshots.' },
+  { href: '/models', title: 'AI Models', text: 'New model releases, with claims kept apart from tested results.' },
+  { href: '/industries', title: 'Industries', text: 'AI in medicine, defence, robotics, finance and more.' },
+  { href: '/radar', title: 'GitHub Radar', text: 'Repositories gaining momentum.' },
+  { href: '/research', title: 'Research Lab', text: 'Papers, models and research demos.' },
+  { href: '/content', title: 'Content Radar', text: 'Verified stories worth explaining, and a studio to draft them.' },
   { href: '/gems', title: 'Hidden Gems', text: 'Low-visibility projects with strong novelty scores.' },
   { href: '/weekly', title: 'What You Missed', text: 'The weekly digest of verified discoveries.' },
   { href: '/bookmarks', title: 'Saved', text: 'Your saved items and collections.' },
   { href: '/settings', title: 'Settings', text: 'Theme, topics, sources, density and refresh.' },
+  { href: '/account', title: 'Account', text: 'Sign in to request translations and AI drafts.' },
   { href: '/status', title: 'Pipeline status', text: 'Which sources responded and when data last changed.' },
 ];
 

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Activity, ArrowUpRight, GitFork, Star } from 'lucide-react';
 import { categoryName, CLAIM_LABELS, type DiscoveryView, type Kind } from '@/lib/types';
+import { EVIDENCE_STAGES, type EvidenceStage } from '@/lib/industries';
 import { fmtInt } from '@/lib/utils/text';
 import { relativeTime } from '@/lib/utils/time';
 import { Confidence, ExternalLink, Rule, TimeText } from '@/components/ui/primitives';
@@ -52,6 +53,14 @@ export function DiscoveryCard({ d, now }: { d: DiscoveryView; now: string }) {
         <Link href={`/d/${d.id}`} className="stretch-link">{d.headline}</Link>
       </h3>
       <p className="t-small text-fg2 clamp-3 break-anywhere">{d.summary}</p>
+      {d.model || d.evidenceStage?.cue ? (
+        <ul className="flex flex-wrap gap-1.5">
+          {d.model?.openWeights === true ? <li className="tag">Open weights</li> : null}
+          {d.model?.license ? <li className="tag">{d.model.license}</li> : null}
+          {d.model && !d.model.independentlyTested ? <li className="tag">Publisher’s claims</li> : null}
+          {d.evidenceStage?.cue ? <li className="tag">{EVIDENCE_STAGES[d.evidenceStage.stage as EvidenceStage] ?? d.evidenceStage.stage}</li> : null}
+        </ul>
+      ) : null}
       {signal ? (
         <p className="flex items-start gap-2 t-meta text-fg">
           <Activity size={14} className="mt-0.5 shrink-0 text-link" aria-hidden="true" />
@@ -86,6 +95,7 @@ export function FeaturedStory({ d, now }: { d: DiscoveryView; now: string }) {
         <p className="t-body text-fg2 measure clamp-3 break-anywhere">{d.editorial.what}</p>
         <div className="lift mt-1 flex flex-wrap items-center gap-2.5">
           <Link href={`/d/${d.id}`} className="btn btn-primary">Read the brief</Link>
+          {d.conceptId || d.editorial.how ? <Link href={`/learn/${d.id}`} className="btn">Understand how it works</Link> : null}
           <ExternalLink href={d.canonicalUrl} className="btn">
             Open original <ArrowUpRight size={15} aria-hidden="true" />
           </ExternalLink>

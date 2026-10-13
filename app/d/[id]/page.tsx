@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { DetailView } from '@/components/discovery/detail';
+import { ArticleView } from '@/components/views/learn';
 import { getFeedData } from '@/lib/server/data';
 
 type Params = Promise<{ id: string }>;
@@ -16,7 +16,10 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 }
 
 export default async function DiscoveryPage({ params }: { params: Params }) {
-  const d = await find((await params).id);
+  const { id } = await params;
+  const data = await getFeedData();
+  const d = data.views.find((v) => v.id === id);
   if (!d) notFound();
-  return <DetailView d={d} now={new Date().toISOString()} backHref={d.kind === 'repository' ? '/radar' : '/discover'} />;
+  const generated = Object.fromEntries(Object.entries(data.generated).filter(([, r]) => r.subject === `discovery:${id}`));
+  return <ArticleView d={d} generated={generated} now={new Date().toISOString()} backHref={d.kind === 'repository' ? '/radar' : '/discover'} />;
 }
