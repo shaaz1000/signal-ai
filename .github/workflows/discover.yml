@@ -1,0 +1,22 @@
+name: Discover
+
+# Every three hours: collect, deduplicate, verify, then re-rank so new items
+# are scored. Runs on GitHub's schedule; no browser or session has to be open.
+# Scheduled runs can start late under load and are paused by GitHub after 60
+# days without repository activity.
+on:
+  schedule:
+    - cron: '17 */3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pipeline:
+    uses: ./.github/workflows/pipeline.yml
+    permissions:
+      contents: write
+    secrets: inherit
+    with:
+      commands: discover verify rank curate

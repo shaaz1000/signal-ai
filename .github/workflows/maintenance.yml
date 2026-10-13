@@ -1,0 +1,19 @@
+name: Weekly maintenance
+
+# Mondays: thin old snapshots, archive dormant items, purge rejected ones.
+on:
+  schedule:
+    - cron: '23 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pipeline:
+    uses: ./.github/workflows/pipeline.yml
+    permissions:
+      contents: write
+    secrets: inherit
+    with:
+      commands: maintain rank

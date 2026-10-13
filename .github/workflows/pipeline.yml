@@ -1,0 +1,104 @@
+# Reusable pipeline runner. The scheduled workflows call this with the list of
+# jobs to run, so database handling lives in one place.
+#
+# Storage is chosen by configuration:
+#   * DATABASE_URL secret set  -> Postgres (Supabase or any other host).
+#   * DATABASE_URL not set     -> the embedded store, restored from and saved
+#                                 back to the `data` branch of this repository.
+name: Pipeline
+
+on:
+  workflow_call:
+    inputs:
+      commands:
+        description: Space-separated pipeline commands (discover verify rank curate maintain)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# One pipeline run at a time: two writers on one store would race.
+concurrency:
+  group: signal-pipeline
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write # only used to update the `data` branch in embedded mode
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      # The built-in token is enough for public repository metadata.
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
+      REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
+      AI_PROVIDER: ${{ vars.AI_PROVIDER || 'extractive' }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+      AI_MAX_ITEMS_PER_RUN: ${{ vars.AI_MAX_ITEMS_PER_RUN || '40' }}
+      NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL || format('https://github.com/{0}', github.repository) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+
+      - name: Restore embedded store from the data branch
+        if: env.DATABASE_URL == ''
+        run: |
+          if git fetch --depth 1 origin data 2>/dev/null && git show FETCH_HEAD:store.tar.gz > "$RUNNER_TEMP/store.tar.gz" 2>/dev/null; then
+            npm run datastore -- unpack "$RUNNER_TEMP/store.tar.gz"
+          else
+            echo "No data branch yet; starting with an empty store."
+          fi
+
+      - name: Apply migrations
+        run: npm run db:migrate
+
+      - name: Run pipeline
+        env:
+          COMMANDS: ${{ inputs.commands }}
+        run: |
+          status=0
+          for command in $COMMANDS; do
+            case "$command" in
+              discover|verify|rank|curate|maintain) ;;
+              *) echo "Unknown command: $command"; exit 2 ;;
+            esac
+            echo "::group::$command"
+            # A failed stage is reported but later stages still run on the data that exists.
+            npx tsx scripts/run.ts "$command" || status=1
+            echo "::endgroup::"
+          done
+          exit $status
+
+      - name: Summarise
+        if: always()
+        run: |
+          {
+            echo '### Pipeline status'
+            echo '```json'
+            npx tsx scripts/run.ts status
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Save embedded store and snapshot to the data branch
+        if: always() && env.DATABASE_URL == ''
+        run: |
+          out="$RUNNER_TEMP/data"
+          mkdir -p "$out"
+          npm run datastore -- pack "$out/store.tar.gz"
+          npx tsx scripts/run.ts export "$out/snapshot.json"
+          cd "$out"
+          git init -q -b data
+          git add store.tar.gz snapshot.json
+          git -c user.name="signal-pipeline" -c user.email="actions@users.noreply.github.com" commit -q -m "data: pipeline state $(date -u +%Y-%m-%dT%H:%MZ)"
+          # A single-commit branch, replaced each run, so history does not accumulate binary blobs.
+          git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" data

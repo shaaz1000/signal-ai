@@ -1,0 +1,19 @@
+name: Daily curation
+
+# Once a day: full re-rank, featured story and the weekly "What You Missed" edition.
+on:
+  schedule:
+    - cron: '47 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pipeline:
+    uses: ./.github/workflows/pipeline.yml
+    permissions:
+      contents: write
+    secrets: inherit
+    with:
+      commands: rank curate
