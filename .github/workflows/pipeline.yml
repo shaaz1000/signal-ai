@@ -45,7 +45,7 @@ jobs:
       VERIFY_MAX_AGE_HOURS: ${{ vars.VERIFY_MAX_AGE_HOURS }}
       NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL || format('https://github.com/{0}', github.repository) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
