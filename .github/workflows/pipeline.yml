@@ -105,7 +105,7 @@ jobs:
 
       - name: Upload static site
         if: always() && vars.PUBLISH_SITE == 'true'
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: ${{ runner.temp }}/site
 
