@@ -50,12 +50,14 @@ export function dateTime(iso: string | null): string {
   })} UTC`;
 }
 
-/** Next firing of the discovery workflow cron (`17 *\/3 * * *`, UTC). */
+/**
+ * Next scheduled slot of the discovery workflow cron (`17 * * * *`, UTC).
+ * GitHub starts scheduled runs late or skips them under load, so this is when
+ * a run is due, not a promise that one will start then.
+ */
 export function nextDiscoveryRun(now: Date): Date {
   const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), now.getUTCHours(), 17, 0));
-  while (next.getUTCHours() % 3 !== 0 || next.getTime() <= now.getTime()) {
-    next.setUTCHours(next.getUTCHours() + 1);
-  }
+  if (next.getTime() <= now.getTime()) next.setUTCHours(next.getUTCHours() + 1);
   return next;
 }
 

@@ -15,7 +15,7 @@ export interface FeedData {
   generated: Record<string, GeneratedRecord>;
 }
 
-/** How long one server instance reuses a loaded feed. Data only changes every three hours. */
+/** How long one server instance reuses a loaded feed. Data only changes when the pipeline runs, at most hourly. */
 const TTL_MS = 30_000;
 let memo: { at: number; data: Promise<FeedData> } | null = null;
 

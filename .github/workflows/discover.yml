@@ -1,12 +1,15 @@
 name: Discover
 
-# Every three hours: collect, deduplicate, verify, then re-rank so new items
-# are scored. Runs on GitHub's schedule; no browser or session has to be open.
-# Scheduled runs can start late under load and are paused by GitHub after 60
-# days without repository activity.
+# Hourly: collect, deduplicate, verify, then re-rank so new items are scored.
+# Runs on GitHub's schedule; no browser or session has to be open.
+#
+# Scheduled for every hour because GitHub starts scheduled runs late and skips
+# many under load: with a three-hour cron, only about half of the slots ran,
+# leaving gaps of up to seven hours. The pipeline's concurrency group stops runs
+# from overlapping. Schedules are also paused after 60 days without activity.
 on:
   schedule:
-    - cron: '17 */3 * * *'
+    - cron: '17 * * * *'
   workflow_dispatch:
 
 permissions:

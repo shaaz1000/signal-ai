@@ -11,7 +11,7 @@
 | Local and CI database | PGlite (Postgres compiled to WebAssembly) | The same schema, migrations and SQL run in tests and locally with nothing to install. Not SQLite pretending to be Postgres. |
 | Ingestion | Plain TypeScript workers run by `tsx` | Independent of the web app. Each stage is a function taking a database handle, so tests call them directly. |
 | Scheduling | GitHub Actions | As specified. Works with no open session. |
-| Rendering | Dynamic, with a 30 second per-instance cache | Data changes every three hours; pages read preferences from a cookie so the first paint has the right theme and feed. |
+| Rendering | Dynamic, with a 30 second per-instance cache | Data changes at most hourly; pages read preferences from a cookie so the first paint has the right theme and feed. |
 | Filtering | SQL loads active records; one shared pure function filters, sorts and diversifies | The Artifact has no server, so the logic has to run in the browser too. One implementation means the app and the Artifact cannot disagree. At a few thousand active records this is cheap; pushing filters into SQL is the scaling step. |
 | Artifact data | A snapshot file published beside the page | The Artifact content policy blocks `fetch` to every outside host. |
 

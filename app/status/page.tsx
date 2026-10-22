@@ -12,7 +12,7 @@ export default async function StatusPage() {
   const now = new Date().toISOString();
   return (
     <>
-      <PageHeader title="Pipeline status" lede="Updates are periodic, not real time. Discovery runs every three hours from a scheduled workflow, whether or not anyone has this page open." />
+      <PageHeader title="Pipeline status" lede="Updates are periodic, not real time. Discovery is scheduled hourly by a workflow, though GitHub often starts runs late or skips some, whether or not anyone has this page open." />
       <div className="mb-7 flex flex-col gap-4">
         <Freshness status={status} now={now} />
         <div><RefreshButton /></div>

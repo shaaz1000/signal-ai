@@ -25,7 +25,7 @@ export function Freshness({ status, now, level = 'full' }: { status: StatusView 
         <Notice tone="warn">You are looking at demonstration fixtures for interface development. None of these items are real discoveries. Run the ingestion pipeline to replace them.</Notice>
       ) : null}
       {status.stale && !snapshot ? (
-        <Notice tone="warn">This data is stale. The last successful ingestion finished {relativeTime(finished, now)}, and the schedule is every three hours.</Notice>
+        <Notice tone="warn">This data is stale. The last successful ingestion finished {relativeTime(finished, now)}, although runs are scheduled hourly. GitHub may be delaying or skipping scheduled runs; see the status page.</Notice>
       ) : null}
       {failed.length && status.dataMode === 'ingested' ? (
         <Notice>Coverage was reduced in the last run: {failed.map((p) => p.name).join(', ')} did not respond. Other sources were processed normally.</Notice>

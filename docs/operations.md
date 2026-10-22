@@ -4,7 +4,7 @@
 
 | Workflow | Cron (UTC) | Runs |
 |---|---|---|
-| `discover.yml` | `17 */3 * * *` | discover, verify, rank, curate |
+| `discover.yml` | `17 * * * *` | discover, verify, rank, trends, curate |
 | `daily-curation.yml` | `47 5 * * *` | rank, curate |
 | `maintenance.yml` | `23 4 * * 1` | maintain, rank |
 | `ci.yml` | on push and pull request | lint, typecheck, unit and integration tests, build, audit, browser tests |
@@ -27,7 +27,7 @@ The pipeline workflow can republish the interface as a static page after every r
 2. Set the repository variable `PUBLISH_SITE=true` (`gh variable set PUBLISH_SITE --body true`).
 3. Run `gh workflow run discover.yml`, or wait for the next scheduled run.
 
-The site then updates every three hours on GitHub's schedule. It shows the last ingestion time, the next scheduled run, and a stale warning if two runs are missed. Bookmarks and settings there are stored in the visitor's browser.
+The site then updates whenever a scheduled run completes (hourly at best). It shows the last ingestion time, the next scheduled run, and a stale warning if two runs are missed. Bookmarks and settings there are stored in the visitor's browser.
 
 GitHub Pages on a private repository needs a paid plan; on a public repository it is free.
 

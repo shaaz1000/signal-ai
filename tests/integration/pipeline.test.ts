@@ -282,7 +282,7 @@ describe('ranking, curation and maintenance', () => {
     const fresh = await loadStatus(db, 'pglite', new Date(NOW.getTime() + HOUR));
     expect(fresh.stale).toBe(false);
     expect(fresh.dataMode).toBe('ingested');
-    expect(fresh.nextScheduledIngestion).toBe('2026-10-13T12:17:00.000Z');
+    expect(fresh.nextScheduledIngestion).toBe('2026-10-13T11:17:00.000Z');
     const stale = await loadStatus(db, 'pglite', new Date(NOW.getTime() + 9 * HOUR));
     expect(stale.stale).toBe(true);
   });

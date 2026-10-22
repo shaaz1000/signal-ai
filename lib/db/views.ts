@@ -129,7 +129,7 @@ export async function loadStatus(db: Db, storage: StorageKind, now: Date): Promi
     lastCuration: await lastRun(db, 'curate'),
     nextScheduledIngestion: nextDiscoveryRun(now).toISOString(),
     counts: { total, last24h, last7d, verified, unverified },
-    // Two missed 3-hourly runs.
+    // Several missed hourly slots in a row: something is wrong, not just GitHub running late.
     stale: total > 0 && ingested > 0 && now.getTime() - finished > 7 * HOUR,
     dataMode: total === 0 ? 'empty' : ingested === 0 ? 'fixture' : 'ingested',
     storage,

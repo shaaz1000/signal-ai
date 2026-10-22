@@ -14,7 +14,7 @@ There are three ways to run it, all from this repository:
 
 | | What it is | Data |
 |---|---|---|
-| **Next.js application** | The deployable product: server-rendered pages, JSON API, scheduled ingestion. | Live from Postgres, refreshed every three hours by GitHub Actions. |
+| **Next.js application** | The deployable product: server-rendered pages, JSON API, scheduled ingestion. | Live from Postgres, refreshed by hourly scheduled runs on GitHub Actions by GitHub Actions. |
 | **Static site** | The same interface as one HTML page on GitHub Pages. | Rebuilt and republished by the scheduled workflow after every run, so it stays current with no machine switched on. |
 | **Claude Artifact** | That same page published on claude.ai (`npm run build:artifact`). | A timestamped snapshot file. The Artifact sandbox blocks all outside network access, so it cannot update itself, and says so on the page. |
 

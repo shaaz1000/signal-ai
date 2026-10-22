@@ -88,7 +88,7 @@ function Page({ snapshot, path, now }: { snapshot: Snapshot; path: string; now: 
         <PageHeader
           title="Pipeline status"
           lede={status.storage === 'site'
-            ? 'Updates are periodic, not real time. A scheduled workflow runs discovery every three hours and republishes this site, whether or not anyone has it open.'
+            ? 'Updates are periodic, not real time. A workflow scheduled hourly runs discovery and republishes this site, whether or not anyone has it open.'
             : 'This page describes the ingestion run that produced the snapshot you are reading. The live pipeline runs in the companion application, every three hours.'}
         />
         <div className="mb-7 flex flex-col gap-4">

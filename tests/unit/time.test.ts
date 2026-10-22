@@ -71,30 +71,27 @@ describe('nextDiscoveryRun', () => {
   it.each([
     ['at midnight', '2026-03-01T00:00:00Z', '2026-03-01T00:17:00.000Z'],
     ['one second before a slot', '2026-03-01T03:16:59Z', '2026-03-01T03:17:00.000Z'],
-    ['exactly on a slot', '2026-03-01T03:17:00Z', '2026-03-01T06:17:00.000Z'],
-    ['one second after a slot', '2026-03-01T03:17:01Z', '2026-03-01T06:17:00.000Z'],
-    ['in an off hour', '2026-03-01T04:40:00Z', '2026-03-01T06:17:00.000Z'],
-    ['late in the hour before a slot', '2026-03-01T08:59:59Z', '2026-03-01T09:17:00.000Z'],
-    ['before the last slot of the day', '2026-03-01T21:00:00Z', '2026-03-01T21:17:00.000Z'],
-    ['after the last slot of the day', '2026-03-01T21:17:30Z', '2026-03-02T00:17:00.000Z'],
+    ['exactly on a slot', '2026-03-01T03:17:00Z', '2026-03-01T04:17:00.000Z'],
+    ['one second after a slot', '2026-03-01T03:17:01Z', '2026-03-01T04:17:00.000Z'],
+    ['late in an hour', '2026-03-01T04:40:00Z', '2026-03-01T05:17:00.000Z'],
+    ['after the last slot of the day', '2026-03-01T23:17:30Z', '2026-03-02T00:17:00.000Z'],
     ['just before midnight', '2026-03-01T23:59:59Z', '2026-03-02T00:17:00.000Z'],
-    ['across a month boundary', '2026-01-31T22:30:00Z', '2026-02-01T00:17:00.000Z'],
-    ['across a year boundary', '2025-12-31T23:00:00Z', '2026-01-01T00:17:00.000Z'],
+    ['across a month boundary', '2026-01-31T23:30:00Z', '2026-02-01T00:17:00.000Z'],
+    ['across a year boundary', '2025-12-31T23:20:00Z', '2026-01-01T00:17:00.000Z'],
   ])('%s', (_label, now, expected) => {
     expect(nextDiscoveryRun(new Date(now)).toISOString()).toBe(expected);
   });
 
-  it('always lands on hh:17 with hh divisible by 3, strictly after now', () => {
+  it('always lands on hh:17, strictly after now and within the hour', () => {
     const start = Date.parse('2026-03-01T00:00:00Z');
     // Every 7 minutes across two days.
     for (let t = start; t < start + 48 * 3_600_000; t += 7 * 60_000) {
       const now = new Date(t);
       const next = nextDiscoveryRun(now);
-      expect(next.getUTCHours() % 3).toBe(0);
       expect(next.getUTCMinutes()).toBe(17);
       expect(next.getUTCSeconds()).toBe(0);
       expect(next.getTime()).toBeGreaterThan(t);
-      expect(next.getTime() - t).toBeLessThanOrEqual(3 * 3_600_000);
+      expect(next.getTime() - t).toBeLessThanOrEqual(3_600_000);
     }
   });
 });
