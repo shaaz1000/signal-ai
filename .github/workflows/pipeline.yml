@@ -29,6 +29,8 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: write # only used to update the `data` branch in embedded mode
+    outputs:
+      site_uploaded: ${{ steps.upload.outcome == 'success' }}
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       # The built-in token is enough for public repository metadata.
@@ -53,12 +55,23 @@ jobs:
       - run: npm ci
 
       - name: Restore embedded store from the data branch
+        id: restore
         if: env.DATABASE_URL == ''
         run: |
-          if ! git fetch --depth 1 origin data 2>/dev/null; then
+          # Only a branch that really does not exist means "start empty". Any other failure to read it
+          # (network, auth, rate limit) must stop the run: starting empty would overwrite the saved store.
+          set +e
+          git ls-remote --exit-code --heads origin data > /dev/null
+          remote=$?
+          set -e
+          if [ "$remote" -eq 2 ]; then
             echo "No data branch yet; starting with an empty store."
             exit 0
+          elif [ "$remote" -ne 0 ]; then
+            echo "::error::Could not read the data branch (git exit $remote). Stopping rather than starting from an empty store."
+            exit 1
           fi
+          git fetch --depth 1 origin data
           # The store is saved whole, or split into parts when it nears GitHub's 100 MB file limit.
           parts=$(git ls-tree --name-only FETCH_HEAD | grep -E '^store\.tar\.gz(\.part-[a-z]+)?$' | sort)
           if [ -z "$parts" ]; then
@@ -70,6 +83,7 @@ jobs:
           npm run datastore -- unpack "$RUNNER_TEMP/store.tar.gz"
 
       - name: Apply migrations
+        id: migrate
         run: npm run db:migrate
 
       - name: Run pipeline
@@ -99,8 +113,11 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # The steps below write or publish state. They still run when a pipeline stage failed, to keep
+      # partial progress, but never when the restore or migration failed: then the database in hand
+      # is not the real one, and saving or publishing it would replace good data with bad.
       - name: Export snapshot
-        if: always()
+        if: always() && steps.migrate.outcome == 'success' && (steps.restore.outcome == 'success' || steps.restore.outcome == 'skipped')
         run: |
           mkdir -p "$RUNNER_TEMP/data"
           npx tsx scripts/run.ts export "$RUNNER_TEMP/data/snapshot.json"
@@ -108,17 +125,18 @@ jobs:
       # The static site is the Artifact page as a complete document. Republishing it
       # after every run is what keeps a public page current with no machine switched on.
       - name: Build static site
-        if: always() && vars.PUBLISH_SITE == 'true'
+        if: always() && steps.migrate.outcome == 'success' && (steps.restore.outcome == 'success' || steps.restore.outcome == 'skipped') && vars.PUBLISH_SITE == 'true'
         run: npx tsx scripts/build-artifact.ts --snapshot "$RUNNER_TEMP/data/snapshot.json" --out "$RUNNER_TEMP/artifact" --site "$RUNNER_TEMP/site"
 
       - name: Upload static site
-        if: always() && vars.PUBLISH_SITE == 'true'
+        id: upload
+        if: always() && steps.migrate.outcome == 'success' && (steps.restore.outcome == 'success' || steps.restore.outcome == 'skipped') && vars.PUBLISH_SITE == 'true'
         uses: actions/upload-pages-artifact@v3
         with:
           path: ${{ runner.temp }}/site
 
       - name: Save embedded store and snapshot to the data branch
-        if: always() && env.DATABASE_URL == ''
+        if: always() && steps.migrate.outcome == 'success' && (steps.restore.outcome == 'success' || steps.restore.outcome == 'skipped') && env.DATABASE_URL == ''
         run: |
           out="$RUNNER_TEMP/data"
           npm run datastore -- pack "$out/store.tar.gz"
@@ -140,7 +158,8 @@ jobs:
   publish-site:
     name: Publish static site
     # Opt-in: set the repository variable PUBLISH_SITE=true and enable GitHub Pages (source: GitHub Actions).
-    if: always() && vars.PUBLISH_SITE == 'true'
+    # Deploy only a site built from a correctly restored database in this run.
+    if: always() && vars.PUBLISH_SITE == 'true' && needs.run.outputs.site_uploaded == 'true'
     needs: run
     runs-on: ubuntu-latest
     timeout-minutes: 10
