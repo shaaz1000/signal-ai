@@ -55,11 +55,19 @@ jobs:
       - name: Restore embedded store from the data branch
         if: env.DATABASE_URL == ''
         run: |
-          if git fetch --depth 1 origin data 2>/dev/null && git show FETCH_HEAD:store.tar.gz > "$RUNNER_TEMP/store.tar.gz" 2>/dev/null; then
-            npm run datastore -- unpack "$RUNNER_TEMP/store.tar.gz"
-          else
+          if ! git fetch --depth 1 origin data 2>/dev/null; then
             echo "No data branch yet; starting with an empty store."
+            exit 0
           fi
+          # The store is saved whole, or split into parts when it nears GitHub's 100 MB file limit.
+          parts=$(git ls-tree --name-only FETCH_HEAD | grep -E '^store\.tar\.gz(\.part-[a-z]+)?$' | sort)
+          if [ -z "$parts" ]; then
+            echo "::error::The data branch exists but holds no store file. Refusing to start from an empty store and overwrite it."
+            exit 1
+          fi
+          : > "$RUNNER_TEMP/store.tar.gz"
+          for part in $parts; do git show "FETCH_HEAD:$part" >> "$RUNNER_TEMP/store.tar.gz"; done
+          npm run datastore -- unpack "$RUNNER_TEMP/store.tar.gz"
 
       - name: Apply migrations
         run: npm run db:migrate
@@ -115,8 +123,16 @@ jobs:
           out="$RUNNER_TEMP/data"
           npm run datastore -- pack "$out/store.tar.gz"
           cd "$out"
+          # GitHub rejects any file over 100 MB. Split well below that so growth can never block a save again.
+          size=$(stat -c %s store.tar.gz)
+          echo "Store is $((size / 1048576)) MB compressed"
+          if [ "$size" -gt $((90 * 1048576)) ]; then
+            split -b 90m -a 2 store.tar.gz store.tar.gz.part-
+            rm store.tar.gz
+            echo "::warning::The embedded store is over 90 MB and was split into parts. Consider moving to hosted Postgres (DATABASE_URL)."
+          fi
           git init -q -b data
-          git add store.tar.gz snapshot.json
+          git add store.tar.gz* snapshot.json
           git -c user.name="signal-pipeline" -c user.email="actions@users.noreply.github.com" commit -q -m "data: pipeline state $(date -u +%Y-%m-%dT%H:%MZ)"
           # A single-commit branch, replaced each run, so history does not accumulate binary blobs.
           git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" data

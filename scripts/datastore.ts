@@ -18,6 +18,7 @@ async function main() {
 
   if (command === 'pack') {
     const handle = await openPglite(dir);
+    await handle.compact!();
     const blob = await handle.dump!();
     await handle.close();
     await writeFile(file, Buffer.from(await blob.arrayBuffer()));

@@ -12,6 +12,8 @@ interface Handle {
   close: () => Promise<void>;
   /** Present for the embedded store only; used to pack it for the data branch. */
   dump?: () => Promise<Blob>;
+  /** Embedded store only: rewrites tables without dead row versions before packing. */
+  compact?: () => Promise<void>;
 }
 
 const MIGRATIONS = path.join(/* turbopackIgnore: true */ process.cwd(), 'drizzle');
@@ -43,6 +45,12 @@ export async function openPglite(dataDir?: string, loadDataDir?: Blob): Promise<
     kind: 'pglite',
     close: () => client.close(),
     dump: async () => (await client.dumpDataDir('gzip')) as Blob,
+    compact: async () => {
+      // Every run updates most rows, and each update leaves the old version behind until vacuumed.
+      // Measured on 26 Oct: 238 MB on disk, 73 MB after this.
+      await client.exec('VACUUM FULL');
+      await client.exec('CHECKPOINT');
+    },
   };
 }
 

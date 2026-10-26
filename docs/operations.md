@@ -69,6 +69,7 @@ Publish `signal-ai.html` with `snapshot.json` as a supporting file. The latest p
 | "Coverage was reduced" notice | One or more sources failed in the last run | Check `/status` for which. It retries next run. |
 | "This data is stale" warning | No successful discovery run for 7 hours | Check the Actions tab; scheduled workflows may be disabled or failing. |
 | Verification run is `degraded` with a rate-limit message | GitHub API allowance used up | Nothing; remaining repositories are verified on the next run. Lower `GITHUB_CALL_BUDGET` if it recurs. |
+| "Last ingestion" stops advancing while runs still appear in the Actions tab | The save step failed, so each run started again from the last saved store. This happened from 24 to 26 October when the store passed GitHub's 100 MB file limit. | Open the failed run and read "Save embedded store". The store is now compacted before saving and split into parts above 90 MB. |
 | Many items "Not measured" for growth | Only one snapshot so far | Wait for the next run; velocity needs two observations. |
 | App shows "The discovery data could not be loaded" | Database unreachable | Check `DATABASE_URL` and the database status. |
 
